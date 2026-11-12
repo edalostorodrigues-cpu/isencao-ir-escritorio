@@ -11,11 +11,24 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilização CSS personalizada (Tons de Dourado, Cinza Escuro e Estética Corporativa)
+# Estilização CSS Avançada: Logotipo de Fundo (Watermark Elegante) e Cores Corporativas
 st.markdown("""
     <style>
     .main {
         background-color: #FAFAFA;
+        /* Logotipo do escritório como marca d'água elegante no fundo */
+        background-image: url('URL_DA_SUA_LOGO_AQUI');
+        background-repeat: no-repeat;
+        background-position: center 60%;
+        background-size: 450px auto;
+        background-attachment: fixed;
+    }
+    /* Deixa o fundo levemente translúcido para o texto destacar */
+    .block-container {
+        background-color: rgba(255, 255, 255, 0.92);
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
     }
     .stButton>button {
         background: linear-gradient(135deg, #C5A059 0%, #997A38 100%);
@@ -33,14 +46,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Cabeçalho com o Logotipo Estilizado do Escritório (O "S" com as Balanças e Tipografia)
+# Cabeçalho Elegante do Escritório
 st.markdown("""
     <div style="text-align: center; padding: 10px 0 20px 0;">
-        <div style="font-size: 42px; color: #C5A059; margin-bottom: -5px;">⚖️ <b>Ⓢ</b></div>
-        <h2 style="color: #2C3E50; font-family: 'Georgia', serif; margin-top: 5px; margin-bottom: 0;">Samile Schmitt</h2>
+        <h2 style="color: #2C3E50; font-family: 'Georgia', serif; margin-bottom: 0;">Samile Schmitt</h2>
         <p style="letter-spacing: 4px; color: #997A38; font-size: 13px; font-weight: bold; margin-top: 5px;">A D V O C A C I A</p>
         <hr style="width: 120px; border: 1px solid #C5A059; margin: 15px auto;">
-        <h4 style="color: #555; font-weight: normal; font-size: 16px; margin-top: 5px;">Módulo de Análise Inteligente e Cálculo de Isenção de IR (Doença Grave)</h4>
+        <h4 style="color: #555; font-weight: normal; font-size: 15px; margin-top: 5px;">Módulo de Análise Inteligente e Cálculo de Isenção de IR (Doença Grave)</h4>
     </div>
 """, unsafe_allow_html=True)
 
