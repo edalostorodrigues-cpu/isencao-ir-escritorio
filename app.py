@@ -13,7 +13,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilização CSS inspirada no padrão corporativo da Otto
+# Estilização CSS corporativa
 st.markdown("""
     <style>
     .main { background-color: #FDFCFB; }
@@ -46,7 +46,7 @@ st.markdown("""
         <h2 style="color: #2C3E50; font-family: 'Georgia', serif; margin-bottom: 0;">Samile Schmitt</h2>
         <p style="letter-spacing: 5px; color: #997A38; font-size: 13px; font-weight: bold; margin-top: 5px;">A D V O C A C I A</p>
         <hr style="width: 140px; border: 1px solid #C5A059; margin: 15px auto;">
-        <h4 style="color: #555; font-weight: normal; font-size: 15px; margin-top: 5px;">Módulo de Análise Previdenciária e Tributária (Padrão Otto)</h4>
+        <h4 style="color: #555; font-weight: normal; font-size: 15px; margin-top: 5px;">Módulo de Auditoria e Isenção de IR (Lei 7.713/88)</h4>
     </div>
 """, unsafe_allow_html=True)
 
@@ -77,24 +77,20 @@ def extrair_texto_pdfs(files):
             st.warning(f"⚠️ Aviso: Falha ao ler o arquivo '{file.name}'.")
     return texto_total
 
-# Auditoria Inteligente alinhada ao rigor técnico da Otto
-def analisar_documentos_com_ia(texto_documentos, api_key):
+# Extração focada exclusivamente em mapear os valores declarados sem distorção
+def extrair_dados_fiscais(texto_documentos, api_key):
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-3.8-flash')
     
     prompt = f"""
-    Você é a inteligência artificial jurídico-tributária 'Otto', especialista em auditoria de Imposto de Renda e Isenção por Doença Grave (Lei 7.713/88).
-    Analise rigorosamente o texto extraído dos documentos fiscais abaixo.
-    
-    Extraia com absoluta precisão os valores de Rendimentos Tributáveis e Imposto de Renda Retido na Fonte (IRRF) para os anos de 2023, 2024 e 2025.
-    Retorne UM JSON PURO (sem blocos de markdown, apenas o json) seguindo estritamente esta estrutura, com valores em CENTAVOS (inteiros):
+    Você é um assistente de extração de dados contábeis de IRPF. Localize os valores exatos de "Rendimentos Tributáveis Recebidos de PJ ou PF" e o "Imposto de Renda Retido na Fonte (IRRF)" declarados nos anos de 2023, 2024 e 2025.
+    Retorne estritamente UM JSON PURO (sem formatação markdown de código, apenas o json) com os valores convertidos em CENTAVOS (inteiros). Se não houver dados para o ano, preencha com 0:
     {{
       "nome_cliente": "Nome completo do contribuinte",
-      "patologia_cid": "Não localizado",
       "anos": {{
-        "2023": {{"rend_tributavel_original": 0, "ir_devido_original": 0, "ir_13_inss": 0}},
-        "2024": {{"rend_tributavel_original": 0, "ir_devido_original": 0, "ir_13_inss": 0}},
-        "2025": {{"rend_tributavel_original": 0, "ir_devido_original": 0, "ir_13_inss": 0}}
+        "2023": {{"rend_tributavel_original": 0, "ir_retido_original": 0}},
+        "2024": {{"rend_tributavel_original": 0, "ir_retido_original": 0}},
+        "2025": {{"rend_tributavel_original": 0, "ir_retido_original": 0}}
       }}
     }}
     
@@ -107,7 +103,7 @@ def analisar_documentos_com_ia(texto_documentos, api_key):
         texto_limpo = response.text.replace("```json", "").replace("```", "").strip()
         return json.loads(texto_limpo)
     except Exception as e:
-        st.error(f"Erro na auditoria por IA: {e}")
+        st.error(f"Erro na extração: {e}")
         return None
 
 lista_cids = [
@@ -124,13 +120,13 @@ lista_cids = [
 ]
 
 if arquivos_pdf and api_key_input:
-    st.success(f"✨ {len(arquivos_pdf)} documento(s) carregado(s) com sucesso na base segura.")
+    st.success(f"✨ {len(arquivos_pdf)} documento(s) carregado(s) com sucesso.")
     
-    if st.button("🤖 Executar Auditoria Inteligente (Padrão Otto)", type="primary"):
-        with st.spinner("A Otto está auditando minuciosamente os documentos fiscais..."):
+    if st.button("🤖 Ler e Extrair Dados dos Documentos", type="primary"):
+        with st.spinner("Extraindo os dados fiscais originais dos arquivos..."):
             texto_extraido = extrair_texto_pdfs(arquivos_pdf)
             if texto_extraido.strip():
-                dados_cliente = analisar_documentos_com_ia(texto_extraido, api_key_input)
+                dados_cliente = extrair_dados_fiscais(texto_extraido, api_key_input)
                 st.session_state['dados_cliente'] = dados_cliente
             else:
                 st.error("Nenhum texto legível foi extraído dos PDFs.")
@@ -153,17 +149,19 @@ if arquivos_pdf and api_key_input:
             data_editada = st.text_input("Data de Início da Doença (DD/MM/AAAA)", "15/01/2023", help="Digite no formato DD/MM/AAAA")
             
         st.markdown("---")
-        st.markdown("#### 📊 Demonstrativo de Valores Originais Extraídos")
+        st.markdown("#### 📊 Conferência de Valores Extraídos dos PDFs")
+        st.info("💡 **Dica de Auditoria:** Confira abaixo se os valores extraídos batem com as declarações oficiais antes de rodar o cálculo final.")
+        
         tabela_conf = []
         for ano, info in dados_cliente['anos'].items():
             tabela_conf.append({
                 "Ano": ano,
-                "Rend. Tributável (R$)": info['rend_tributavel_original'] / 100,
-                "IR Original Retido (R$)": info['ir_devido_original'] / 100
+                "Rend. Tributável Original (R$)": info['rend_tributavel_original'] / 100,
+                "IR Retido Original (R$)": info['ir_retido_original'] / 100
             })
         st.dataframe(pd.DataFrame(tabela_conf), use_container_width=True)
         
-        if st.button("🚀 Processar Cálculo Determinístico Otto", type="primary", use_container_width=True):
+        if st.button("🚀 Executar Motor de Cálculo de Indébito", type="primary", use_container_width=True):
             tabelas_oficiais = {
                 2023: {"limite_isencao_mensal": 190398, "aliquota": 0.15},
                 2024: {"limite_isencao_mensal": 211200, "aliquota": 0.15},
@@ -177,34 +175,31 @@ if arquivos_pdf and api_key_input:
             for ano_str, info in dados_cliente['anos'].items():
                 ano = int(ano_str)
                 rend = info['rend_tributavel_original']
-                iro = info['ir_devido_original']
-                ir13 = info['ir_13_inss']
+                ir_retido = info['ir_retido_original']
                 
                 tabela = tabelas_oficiais.get(ano, tabelas_oficiais[2024])
                 limite_anual = tabela["limite_isencao_mensal"] * 12
                 
-                # Motor rigoroso Otto de cálculo de indébito tributário
+                # Cálculo determinístico: se há rendimento isento por doença grave, 
+                # o imposto retido sobre a faixa isenta constitui indébito tributário integral.
                 base_isenta = min(rend, limite_anual)
-                dif_anual = int(base_isenta * tabela["aliquota"])
-                dif_anual = min(dif_anual, iro)
+                restituicao_anual = int(base_isenta * tabela["aliquota"])
+                restituicao_anual = min(restituicao_anual, ir_retido)
                 
-                total_restituicao_13 = ir13 if ir13 > 0 else int(iro * 0.10)
-                total_ano = dif_anual + total_restituicao_13
-                soma_total_geral += total_ano
+                soma_total_geral += restituicao_anual
                 
                 resultado_linhas.append({
                     "Ano": ano,
-                    "Diferença Anual (R$)": round(dif_anual / 100, 2),
-                    "IR do 13º (R$)": round(total_restituicao_13 / 100, 2),
-                    "Total Estimado (R$)": round(total_ano / 100, 2)
+                    "Rend. Tributável (R$)": round(rend / 100, 2),
+                    "IR Retido (R$)": round(ir_retido / 100, 2),
+                    "Crédito Restituível (R$)": round(restituicao_anual / 100, 2)
                 })
 
                 memoria_calculo_detalhada.append({
                     "ano": ano,
                     "rend": rend / 100,
-                    "dif_anual": dif_anual / 100,
-                    "ir13": total_restituicao_13 / 100,
-                    "total": total_ano / 100
+                    "ir_retido": ir_retido / 100,
+                    "restituicao": restituicao_anual / 100
                 })
                 
             df_final = pd.DataFrame(resultado_linhas)
@@ -218,10 +213,10 @@ if arquivos_pdf and api_key_input:
             st.session_state['data_analise'] = datetime.now().strftime("%d/%m/%Y às %H:%M")
 
         if 'df_final' in st.session_state:
-            st.success("Auditoria e cálculo executados com sucesso sob diretriz da Otto!")
+            st.success("Cálculo executado com sucesso!")
             st.markdown(f"""
                 <div style="background-color: #F4F6F7; padding: 15px; border-left: 4px solid #C5A059; border-radius: 4px; margin-bottom: 20px;">
-                    <h4 style="margin:0; color:#2C3E50;">Parecer Técnico Preliminar — {st.session_state['nome_editado']}</h4>
+                    <h4 style="margin:0; color:#2C3E50;">Parecer Técnico — {st.session_state['nome_editado']}</h4>
                     <p style="margin:5px 0 0 0; color:#555;"><b>Patologia / CID:</b> {st.session_state['patologia_editada']} | <b>Início da Enfermidade:</b> {st.session_state['data_editada']} | <b>Emissão:</b> {st.session_state['data_analise']}</p>
                 </div>
             """, unsafe_allow_html=True)
@@ -229,14 +224,13 @@ if arquivos_pdf and api_key_input:
             st.dataframe(st.session_state['df_final'], use_container_width=True)
             st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {st.session_state['soma_total_geral']:,.2f}")
             
-            st.markdown("### 🔍 Memória de Cálculo Analítica (Diretriz Otto)")
+            st.markdown("### 🔍 Memória de Cálculo Analítica")
             for item in st.session_state['memoria']:
                 st.markdown(f"""
-                * **Exercício {item['ano']}**: Rendimento tributável auditado de **R$ {item['rend']:,.2f}**. 
-                  * *Fundamentação Art. 6º, XIV, Lei 7.713/88*: Incidência da isenção sobre os proventos.
-                  * *Indébito sobre Rendimentos Regulares*: **R$ {item['dif_anual']:,.2f}**.
-                  * *Indébito sobre 13º Salário (Retenção Isolada)*: **R$ {item['ir13']:,.2f}**.
-                  * **Crédito Líquido Apurado no Ano {item['ano']}**: **R$ {item['total']:,.2f}**.
+                * **Exercício {item['ano']}**: 
+                  * *Rendimento Tributável Declarado*: R$ {item['rend']:,.2f}
+                  * *Imposto Retido na Fonte (IRRF)*: R$ {item['ir_retido']:,.2f}
+                  * *Indébito Apurado (Restituição Lei 7.713/88)*: **R$ {item['restituição']:,.2f}**
                 """)
 
             if st.session_state['soma_total_geral'] > 0:
@@ -267,7 +261,7 @@ if arquivos_pdf and api_key_input:
     <div class="header">
         <h1>Samile Schmitt</h1>
         <p>A D V O C A C I A</p>
-        <div class="sub">Parecer Técnico Previdenciário / Tributário — Isenção de IR (Padrão Otto)</div>
+        <div class="sub">Parecer Técnico Previdenciário / Tributário — Isenção de IR (Lei 7.713/88)</div>
     </div>
     
     <div class="info-box">
@@ -285,25 +279,25 @@ if arquivos_pdf and api_key_input:
     </div>
     
     <div class="parecer-box">
-        <h3 style="margin-top:0; color:#2C3E50;">Fundamentação Técnica e Memória de Cálculo (Diretriz Otto)</h3>
+        <h3 style="margin-top:0; color:#2C3E50;">Fundamentação Técnica e Memória de Cálculo</h3>
         <p>A presente auditoria fiscal fundamenta-se estritamente no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que assegura a isenção tributária sobre proventos percebidos por portadores de moléstia grave.</p>
-        <p><b>Parâmetros de Auditoria:</b> O cruzamento de dados obedeceu aos tetos legais vigentes em cada exercício, descontando o indébito do imposto retido na fonte sobre rendimentos regulares e gratificações natalinas, respeitando a prescrição quinquenal.</p>
+        <p><b>Parâmetros de Auditoria:</b> O cruzamento de dados obedeceu aos tetos legais vigentes em cada exercício, apurando o indébito do imposto retido na fonte, respeitando os limites da prescrição quinquenal.</p>
         <p><b>Conclusão Estratégica:</b> O caso apresenta viabilidade jurídica plena, totalizando créditos passíveis de repetição de indébito de <b>R$ {st.session_state['soma_total_geral']:,.2f}</b>.</p>
     </div>
 </body>
 </html>"""
 
             st.download_button(
-                label="📥 Baixar Laudo Completo (Padrão Otto)",
+                label="📥 Baixar Laudo Completo",
                 data=html_relatorio,
-                file_name=f"Laudo_Otto_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html",
+                file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html",
                 mime="text/html",
                 type="primary"
             )
 else:
     st.markdown("""
         <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 20px;">
-            <h3 style="color: #2C3E50;">Módulo Ativo — Padrão Otto</h3>
+            <h3 style="color: #2C3E50;">Sistema de Isenção de IR</h3>
             <p style="color: #666;">Insira sua chave de API na barra lateral e faça o upload dos documentos fiscais para iniciar a auditoria técnica.</p>
         </div>
     """, unsafe_allow_html=True)
