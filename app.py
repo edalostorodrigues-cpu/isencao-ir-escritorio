@@ -5,10 +5,6 @@ import google.generativeai as genai
 import json
 import io
 from datetime import datetime
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
 
 # Configuração da Página
 st.set_page_config(
@@ -240,67 +236,61 @@ if arquivos_pdf and api_key_input:
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 
-            # Geração do PDF Real usando ReportLab
-            buffer = io.BytesIO()
-            doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
-            story = []
-            
-            styles = getSampleStyleSheet()
-            style_title = ParagraphStyle('Title', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=18, textColor=colors.HexColor('#2C3E50'), alignment=1)
-            style_subtitle = ParagraphStyle('Subtitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor('#997A38'), alignment=1, spaceAfter=15)
-            style_heading2 = ParagraphStyle('Heading2', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=12, textColor=colors.HexColor('#2C3E50'), spaceBefore=10, spaceAfter=5)
-            style_body = ParagraphStyle('Body', parent=styles['Normal'], fontName='Helvetica', fontSize=10, textColor=colors.HexColor('#333333'), spaceAfter=6, leading=14)
-            
-            story.append(Paragraph("Samile Schmitt", style_title))
-            story.append(Paragraph("A D V O C A C I A", style_subtitle))
-            story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#C5A059'), spaceAfter=15))
-            
-            story.append(Paragraph("Parecer Tecnico de Viabilidade - Isencao de IR (Lei 7.713/88)", style_heading2))
-            story.append(Paragraph(f"<b>Data da Análise:</b> {st.session_state['data_analise']}", style_body))
-            story.append(Paragraph(f"<b>Cliente / Segurado:</b> {st.session_state['nome_editado']}", style_body))
-            story.append(Paragraph(f"<b>Patologia / CID:</b> {st.session_state['patologia_editada']}", style_body))
-            story.append(Paragraph(f"<b>Início da Enfermidade:</b> {st.session_state['data_editada']}", style_body))
-            story.append(Spacer(1, 10))
-            
-            story.append(Paragraph("<b>Demonstrativo Consolidado de Valores a Recuperar</b>", style_heading2))
-            
-            tabela_dados = [["Ano", "Diferenca Anual (R$)", "IR do 13 (R$)", "Total Estimado (R$)"]]
-            for row in st.session_state['df_final'].values.tolist():
-                tabela_dados.append([str(row[0]), f"R$ {row[1]:,.2f}", f"R$ {row[2]:,.2f}", f"R$ {row[3]:,.2f}"])
-                
-            t = Table(tabela_dados, colWidths=[60, 150, 150, 180])
-            t.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2C3E50')),
-                ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0,0), (-1,-1), 9),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-                ('TOPPADDING', (0,0), (-1,-1), 6),
-                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#EAE6DF')),
-            ]))
-            story.append(t)
-            story.append(Spacer(1, 10))
-            
-            story.append(Paragraph("<b>Memória de Cálculo e Fundamentação Técnica</b>", style_heading2))
-            story.append(Paragraph("A presente análise fundamenta-se no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que garante isenção de Imposto de Renda sobre proventos de aposentadoria ou pensão para portadores de moléstia grave.", style_body))
-            
-            for item in st.session_state['memoria']:
-                texto_mem = f"• <b>Exercício {item['ano']}</b>: Rendimento tributável de R$ {item['rend']:,.2f}. Aplicado o teto legal de isenção, apurou-se indébito de R$ {item['dif_anual']:,.2f} sobre rendimentos regulares e R$ {item['ir13']:,.2f} sobre o 13º salário, totalizando <b>R$ {item['total']:,.2f}</b> no período."
-                story.append(Paragraph(texto_mem, style_body))
-                
-            story.append(Spacer(1, 10))
-            story.append(Paragraph(f"<b>VALOR TOTAL ESTIMADO DA RESTITUIÇÃO: R$ {st.session_state['soma_total_geral']:,.2f}</b>", style_heading2))
-            story.append(Paragraph("<b>STATUS JURÍDICO:</b> VIÁVEL PARA AJUIZAMENTO - Há direito creditício recuperável a favor do segurado.", style_body))
-            
-            doc.build(story)
-            pdf_data = buffer.getvalue()
-            
+            # Geração de Relatório Formatado para Impressão em PDF via navegador
+            html_relatorio = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{ font-family: 'Helvetica', Arial, sans-serif; color: #2C3E50; padding: 40px; }}
+        .header {{ text-align: center; border-bottom: 2px solid #C5A059; padding-bottom: 20px; margin-bottom: 30px; }}
+        .header h1 {{ margin: 0; font-family: 'Georgia', serif; color: #2C3E50; font-size: 26px; }}
+        .header p {{ color: #997A38; font-weight: bold; letter-spacing: 4px; font-size: 13px; margin-top: 5px; }}
+        .sub {{ color: #555; font-size: 12px; margin-top: 5px; }}
+        .info-box {{ background: #FDFCFB; padding: 20px; border-radius: 8px; border: 1px solid #EAE6DF; border-left: 5px solid #C5A059; margin-bottom: 30px; }}
+        .info-box p {{ margin: 8px 0; font-size: 14px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; }}
+        th, td {{ border: 1px solid #EAE6DF; padding: 12px; text-align: left; font-size: 13px; }}
+        th {{ background-color: #2C3E50; color: white; }}
+        .total-box {{ font-size: 18px; font-weight: bold; color: #2C3E50; text-align: right; margin-top: 20px; padding: 15px; background: #F4F6F7; border-radius: 6px; }}
+        .parecer-box {{ background: #F9F9F9; border-left: 4px solid #C5A059; padding: 20px; margin-top: 30px; border-radius: 6px; font-size: 13px; line-height: 1.6; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Samile Schmitt</h1>
+        <p>A D V O C A C I A</p>
+        <div class="sub">Parecer Técnico de Viabilidade — Isenção de IR (Lei 7.713/88)</div>
+    </div>
+    
+    <div class="info-box">
+        <p><b>Data da Análise:</b> {st.session_state['data_analise']}</p>
+        <p><b>Cliente / Segurado:</b> {st.session_state['nome_editado']}</p>
+        <p><b>Patologia / CID:</b> {st.session_state['patologia_editada']}</p>
+        <p><b>Início da Enfermidade:</b> {st.session_state['data_editada']}</p>
+    </div>
+
+    <h3 style="color: #2C3E50; border-bottom: 1px solid #ddd; padding-bottom: 8px;">Demonstrativo Consolidado de Valores a Recuperar</h3>
+    {st.session_state['df_final'].to_html(index=False, classes='table')}
+    
+    <div class="total-box">
+        Valor Total Estimado da Restituição: R$ {st.session_state['soma_total_geral']:,.2f}
+    </div>
+    
+    <div class="parecer-box">
+        <h3 style="margin-top:0; color:#2C3E50;">Fundamentação Técnica e Memória de Cálculo</h3>
+        <p>A presente análise fundamenta-se no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que garante isenção de Imposto de Renda sobre proventos de aposentadoria ou pensão para portadores de moléstia grave.</p>
+        <p><b>Detalhamento:</b> O cálculo aplicou o teto legal de isenção sobre a base tributável informada nos documentos fiscais, apurando o indébito tributário tanto sobre os rendimentos regulares quanto sobre a retenção isolada do 13º salário nos exercícios abrangidos pela prescrição quinquenal.</p>
+        <p><b>Status Jurídico:</b> VIÁVEL PARA AJUIZAMENTO — Há direito creditício recuperável a favor do segurado no montante total de <b>R$ {st.session_state['soma_total_geral']:,.2f}</b>.</p>
+    </div>
+</body>
+</html>"""
+
             st.download_button(
-                label="📥 Baixar Laudo Oficial em PDF",
-                data=pdf_data,
-                file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.pdf",
-                mime="application/pdf",
+                label="📥 Baixar Laudo Completo (Pronto para Salvar em PDF)",
+                data=html_relatorio,
+                file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html",
+                mime="text/html",
                 type="primary"
             )
 else:
