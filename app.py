@@ -11,18 +11,14 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilização CSS Avançada (Corrigido para evitar conflito de chaves)
+# Estilização CSS para deixar a interface refinada e corporativa
 st.markdown("""
     <style>
     .main {
         background-color: #FDFCFB;
-        background-repeat: no-repeat;
-        background-position: center 55%;
-        background-size: 400px auto;
-        background-attachment: fixed;
     }
     .block-container {
-        background-color: rgba(255, 255, 255, 0.94);
+        background-color: rgba(255, 255, 255, 0.96);
         padding: 2.5rem;
         border-radius: 12px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.04);
@@ -44,9 +40,14 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Cabeçalho Elegante do Escritório
+# Cabeçalho Principal com o Logotipo Grande do Escritório
+col_logo1, col_logo2, col_logo3 = st.columns([1, 1.5, 1])
+with col_logo2:
+    # Exibe a imagem oficial do S com a balança em destaque no topo
+    st.image("image_5edb57.png", width=180)
+
 st.markdown("""
-    <div style="text-align: center; padding: 10px 0 20px 0;">
+    <div style="text-align: center; padding: 0px 0 20px 0;">
         <h2 style="color: #2C3E50; font-family: 'Georgia', serif; margin-bottom: 0;">Samile Schmitt</h2>
         <p style="letter-spacing: 4px; color: #997A38; font-size: 13px; font-weight: bold; margin-top: 5px;">A D V O C A C I A</p>
         <hr style="width: 120px; border: 1px solid #C5A059; margin: 15px auto;">
@@ -211,7 +212,7 @@ if arquivos_pdf and api_key_input:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 else:
     st.markdown("""
-        <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 30px;">
+        <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 20px;">
             <h3 style="color: #2C3E50;">Bem-vindo ao Sistema de Isenção</h3>
             <p style="color: #666;">Insira sua chave de API na barra lateral e faça o upload dos documentos digitalizados para iniciar a análise jurídica automatizada.</p>
         </div>
