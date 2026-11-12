@@ -82,8 +82,8 @@ def extrair_texto_pdfs(files):
 # Função que usa o Gemini para extrair os dados estruturados dos documentos
 def analisar_documentos_com_ia(texto_documentos, api_key):
     genai.configure(api_key=api_key)
-    # Modelo atualizado e altamente estável
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    # Retornado para o modelo oficial indicado pelo Google no erro (gemini-3.8-flash)
+    model = genai.GenerativeModel('gemini-3.8-flash')
     
     prompt = f"""
     Você é um assistente jurídico sênior especializado em direito tributário e previdenciário (Lei 7.713/88).
