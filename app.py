@@ -1,14 +1,10 @@
 import streamlit as st
 import pandas as pd
 import pypdf
-import google.generativeai as genai
+import base64
 import json
-import io
+import google.generativeai as genai
 from datetime import datetime, timedelta, timezone
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
 
 # Configuração da Página
 st.set_page_config(
@@ -86,27 +82,23 @@ def extrair_dados_fiscais(texto_documentos, api_key):
     model = genai.GenerativeModel('gemini-3.8-flash')
     
     prompt = f"""
-    Você é um auditor fiscal especialista em imposto de renda. Extraia estritamente os valores nominais exatos de "Rendimentos Tributáveis Recebidos de PJ ou PF" e o "Imposto de Renda Retido na Fonte (IRRF)" declarados nos anos de 2023, 2024 e 2025.
-    Retorne estritamente UM JSON PURO (sem formatação markdown, apenas o json) com os valores convertidos em CENTAVOS (inteiros). Se não houver dados para o ano, preencha com 0:
+    Você é um auditor fiscal especialista em imposto de renda. Analise o texto e retorne estritamente UM JSON PURO (sem blocos de markdown) com os valores nominais EXATOS em Reais (com ponto decimal se houver, ex: 69797.83) de Rendimentos Tributáveis e Imposto Retido na Fonte (IRRF) para os anos de 2023, 2024 e 2025. Se não achar, coloque 0.
     {{
       "nome_cliente": "Nome completo do contribuinte",
       "anos": {{
-        "2023": {{"rend_tributavel_original": 0, "ir_retido_original": 0}},
-        "2024": {{"rend_tributavel_original": 0, "ir_retido_original": 0}},
-        "2025": {{"rend_tributavel_original": 0, "ir_retido_original": 0}}
+        "2023": {{"rend": 0.0, "ir": 0.0}},
+        "2024": {{"rend": 0.0, "ir": 0.0}},
+        "2025": {{"rend": 0.0, "ir": 0.0}}
       }}
     }}
-    
-    TEXTO DOS DOCUMENTOS:
+    TEXTO:
     {texto_documentos[:15000]}
     """
-    
     try:
         response = model.generate_content(prompt)
-        texto_limpo = response.text.replace("```json", "").replace("```", "").strip()
-        return json.loads(texto_limpo)
+        limpo = response.text.replace("```json", "").replace("```", "").strip()
+        return json.loads(limpo)
     except Exception as e:
-        st.error(f"Erro na extração: {e}")
         return None
 
 lista_cids = [
@@ -126,84 +118,76 @@ if arquivos_pdf and api_key_input:
     st.success(f"✨ {len(arquivos_pdf)} documento(s) carregado(s) com sucesso.")
     
     if st.button("🤖 Ler e Extrair Dados dos Documentos", type="primary"):
-        with st.spinner("Extraindo os dados fiscais originais dos arquivos..."):
-            texto_extraido = extrair_texto_pdfs(arquivos_pdf)
-            if texto_extraido.strip():
-                dados_cliente = extrair_dados_fiscais(texto_extraido, api_key_input)
-                st.session_state['dados_cliente'] = dados_cliente
+        with st.spinner("Lendo os dados fiscais..."):
+            texto = extrair_texto_pdfs(arquivos_pdf)
+            res = extrair_dados_fiscais(texto, api_key_input)
+            if res:
+                st.session_state['res_ia'] = res
             else:
-                st.error("Nenhum texto legível foi extraído dos PDFs.")
+                st.error("Erro na leitura automática.")
 
-    if 'dados_cliente' in st.session_state and st.session_state['dados_cliente']:
-        dados_cliente = st.session_state['dados_cliente']
+    # Se a IA leu ou se já temos dados salvos, permitimos a conferência e ajuste manual absoluto
+    if 'res_ia' in st.session_state:
+        res = st.session_state['res_ia']
         
-        st.markdown("### 📋 Dados Cadastrais e Laudo Médico")
-        
+        st.markdown("### 📋 Dados Cadastrais e Auditoria de Valores")
         col1, col2, col3 = st.columns(3)
         with col1:
-            nome_editado = st.text_input("Segurado / Cliente", dados_cliente.get("nome_cliente", ""))
+            nome_editado = st.text_input("Segurado / Cliente", res.get("nome_cliente", "PAULO IRINEU FREITAS COLARES"))
         with col2:
-            cid_selecionado = st.selectbox("Patologia / CID (Selecione na Lista)", lista_cids)
-            if "Outro" in cid_selecionado:
-                patologia_editada = st.text_input("Digite o CID Personalizado", "C20")
-            else:
-                patologia_editada = cid_selecionado
+            cid_selecionado = st.selectbox("Patologia / CID", lista_cids)
+            patologia_editada = st.text_input("CID Específico", "C20 - Neoplasia Maligna (Reto / Intestino)")
         with col3:
-            data_editada = st.text_input("Data de Início da Doença (DD/MM/AAAA)", "11/05/2023", help="Digite no formato DD/MM/AAAA")
+            data_editada = st.text_input("Data de Início da Doença (DD/MM/AAAA)", "11/05/2023")
             
         st.markdown("---")
-        st.markdown("#### 📊 Conferência de Valores Extraídos dos PDFs")
+        st.markdown("#### ✏️ Validação e Ajuste de Valores (Garantia 100% Confiável)")
+        st.info("💡 **Garantia do Escritório:** Confira e ajuste abaixo os valores extraídos para garantir que batem exatamente com a declaração oficial antes de gerar o laudo.")
+
+        anos_dict = res.get("anos", {"2023": {"rend": 0, "ir": 0}, "2024": {"rend": 0, "ir": 0}, "2025": {"rend": 0, "ir": 0}})
         
-        tabela_conf = []
-        for ano, info in dados_cliente['anos'].items():
-            tabela_conf.append({
-                "Ano": ano,
-                "Rend. Tributável Original (R$)": info['rend_tributavel_original'] / 100,
-                "IR Retido Original (R$)": info['ir_retido_original'] / 100
-            })
-        st.dataframe(pd.DataFrame(tabela_conf), use_container_width=True)
+        dados_validados = {}
+        cols_ano = st.columns(3)
         
-        if st.button("🚀 Executar Motor de Cálculo de Indébito", type="primary", use_container_width=True):
-            tetos_isencao_anual = {
-                2023: 22847.76,
-                2024: 24511.92,
-                2025: 27110.40
-            }
+        for i, (ano, vals) in enumerate(anos_dict.items()):
+            with cols_ano[i]:
+                st.markdown(f"**Exercício {ano}**")
+                r_val = st.number_input(f"Rend. Tributável {ano} (R$)", value=float(vals.get("rend", 0.0)), step=100.0, key=f"rend_{ano}")
+                i_val = st.number_input(f"IR Retido {ano} (R$)", value=float(vals.get("ir", 0.0)), step=10.0, key=f"ir_{ano}")
+                dados_validados[ano] = {"rend": r_val, "ir": i_val}
+
+        if st.button("🚀 Executar Cálculo Definitivo e Gerar Parecer", type="primary", use_container_width=True):
+            tetos_isencao_anual = {2023: 22847.76, 2024: 24511.92, 2025: 27110.40}
             
             resultado_linhas = []
-            memoria_calculo_detalhada = []
-            soma_total_geral = 0
+            memoria_detalhada = []
+            soma_total = 0.0
             
-            for ano_str, info in dados_cliente['anos'].items():
+            for ano_str, vals in dados_validados.items():
                 ano = int(ano_str)
-                rend = info['rend_tributavel_original'] / 100
-                ir_retido = info['ir_retido_original'] / 100
-                teto_ano = tetos_isencao_anual.get(ano, 24511.92)
+                rend = vals["rend"]
+                ir_retido = vals["ir"]
+                teto = tetos_isencao_anual.get(ano, 24511.92)
                 
-                restituicao_anual = ir_retido
-                soma_total_geral += restituicao_anual
+                # O indébito tributário é o imposto retido na fonte sobre os proventos protegidos
+                restituicao = ir_retido
+                soma_total += restituicao
                 
                 resultado_linhas.append({
                     "Ano": ano,
                     "Rend. Tributável (R$)": round(rend, 2),
-                    "Teto Isenção Legal (R$)": round(teto_ano, 2),
+                    "Teto Legal (R$)": round(teto, 2),
                     "IR Retido (R$)": round(ir_retido, 2),
-                    "Crédito Restituível (R$)": round(restituicao_anual, 2)
-                })
-
-                memoria_calculo_detalhada.append({
-                    "ano": ano,
-                    "rend": rend,
-                    "teto": teto_ano,
-                    "ir_retido": ir_retido,
-                    "restituicao": restituicao_anual
+                    "Crédito Restituível (R$)": round(restituicao, 2)
                 })
                 
-            df_final = pd.DataFrame(resultado_linhas)
-            
-            st.session_state['df_final'] = df_final
-            st.session_state['memoria'] = memoria_calculo_detalhada
-            st.session_state['soma_total_geral'] = soma_total_geral
+                memoria_detalhada.append({
+                    "ano": ano, "rend": rend, "teto": teto, "ir": ir_retido, "rest": restituicao
+                })
+                
+            st.session_state['df_final'] = pd.DataFrame(resultado_linhas)
+            st.session_state['memoria'] = memoria_detalhada
+            st.session_state['soma_total'] = soma_total
             st.session_state['nome_editado'] = nome_editado
             st.session_state['patologia_editada'] = patologia_editada
             st.session_state['data_editada'] = data_editada
@@ -212,101 +196,76 @@ if arquivos_pdf and api_key_input:
             st.session_state['data_analise'] = datetime.now(fuso_br).strftime("%d/%m/%Y às %H:%M")
 
         if 'df_final' in st.session_state:
-            st.success("Cálculo executado com sucesso!")
+            st.success("Cálculo determinístico executado com sucesso!")
             st.markdown(f"""
                 <div style="background-color: #F4F6F7; padding: 15px; border-left: 4px solid #C5A059; border-radius: 4px; margin-bottom: 20px;">
                     <h4 style="margin:0; color:#2C3E50;">Parecer Técnico — {st.session_state['nome_editado']}</h4>
-                    <p style="margin:5px 0 0 0; color:#555;"><b>Patologia / CID:</b> {st.session_state['patologia_editada']} | <b>Início da Enfermidade:</b> {st.session_state['data_editada']} | <b>Emissão:</b> {st.session_state['data_analise']}</p>
+                    <p style="margin:5px 0 0 0; color:#555;"><b>CID:</b> {st.session_state['patologia_editada']} | <b>Início da Doença:</b> {st.session_state['data_editada']} | <b>Emissão:</b> {st.session_state['data_analise']}</p>
                 </div>
             """, unsafe_allow_html=True)
             
             st.dataframe(st.session_state['df_final'], use_container_width=True)
-            st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {st.session_state['soma_total_geral']:,.2f}")
+            st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {st.session_state['soma_total']:,.2f}")
             
-            st.markdown("### 🔍 Memória de Cálculo Analítica com Indicação do Teto")
-            for item in st.session_state['memoria']:
-                st.markdown(f"""
-                * **Exercício {item['ano']}**: 
-                  * *Rendimento Tributável Declarado*: R$ {item['rend']:,.2f}
-                  * *Teto de Referência / Isenção Legal Anual*: R$ {item['teto']:,.2f}
-                  * *Imposto de Renda Retido na Fonte (IRRF)*: R$ {item['ir_retido']:,.2f}
-                  * *Indébito Tributário Apurado (Restituição Integral)*: **R$ {item['restituicao']:,.2f}**
-                """)
+            # Geração de HTML limpo para download direto
+            html_relatorio = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{ font-family: 'Helvetica', Arial, sans-serif; color: #2C3E50; padding: 40px; }}
+        .header {{ text-align: center; border-bottom: 2px solid #C5A059; padding-bottom: 20px; margin-bottom: 30px; }}
+        .header h1 {{ margin: 0; font-family: 'Georgia', serif; color: #2C3E50; font-size: 26px; }}
+        .header p {{ color: #997A38; font-weight: bold; letter-spacing: 4px; font-size: 13px; margin-top: 5px; }}
+        .sub {{ color: #555; font-size: 12px; margin-top: 5px; }}
+        .info-box {{ background: #FDFCFB; padding: 20px; border-radius: 8px; border: 1px solid #EAE6DF; border-left: 5px solid #C5A059; margin-bottom: 30px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; }}
+        th, td {{ border: 1px solid #EAE6DF; padding: 12px; text-align: left; font-size: 13px; }}
+        th {{ background-color: #2C3E50; color: white; }}
+        .total-box {{ font-size: 18px; font-weight: bold; color: #2C3E50; text-align: right; margin-top: 20px; padding: 15px; background: #F4F6F7; border-radius: 6px; }}
+        .parecer-box {{ background: #F9F9F9; border-left: 4px solid #C5A059; padding: 20px; margin-top: 30px; border-radius: 6px; font-size: 13px; line-height: 1.6; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Samile Schmitt</h1>
+        <p>A D V O C A C I A</p>
+        <div class="sub">Parecer Técnico Previdenciário / Tributário — Isenção de IR (Lei 7.713/88)</div>
+    </div>
+    
+    <div class="info-box">
+        <p><b>Data da Análise:</b> {st.session_state['data_analise']}</p>
+        <p><b>Cliente / Segurado:</b> {st.session_state['nome_editado']}</p>
+        <p><b>Patologia / CID:</b> {st.session_state['patologia_editada']}</p>
+        <p><b>Início da Enfermidade:</b> {st.session_state['data_editada']}</p>
+    </div>
 
-            if st.session_state['soma_total_geral'] > 0:
-                st.markdown("🟢 **STATUS:** `VIÁVEL PARA AJUIZAMENTO` — Há direito creditício recuperável a favor do segurado.")
-            else:
-                st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
+    <h3 style="color: #2C3E50; border-bottom: 1px solid #ddd; padding-bottom: 8px;">Demonstrativo Consolidado de Créditos Tributários</h3>
+    {st.session_state['df_final'].to_html(index=False, classes='table')}
+    
+    <div class="total-box">
+        Montante Total de Restituição Apurado: R$ {st.session_state['soma_total']:,.2f}
+    </div>
+    
+    <div class="parecer-box">
+        <h3 style="margin-top:0; color:#2C3E50;">Fundamentação Técnica e Memória de Cálculo</h3>
+        <p>A presente auditoria fiscal fundamenta-se estritamente no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que assegura a isenção tributária integral sobre proventos percebidos por portadores de moléstia grave a partir da comprovação médica da enfermidade ({st.session_state['data_editada']}).</p>
+        <p><b>Conclusão Estratégica:</b> O caso apresenta viabilidade jurídica plena, totalizando créditos passíveis de repetição de indébito de <b>R$ {st.session_state['soma_total']:,.2f}</b>.</p>
+    </div>
+</body>
+</html>"""
 
-            # Geração do PDF Real usando ReportLab
-            buffer = io.BytesIO()
-            doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
-            story = []
+            b64 = base64.b64encode(html_relatorio.encode()).decode()
+            nome_arquivo = f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html"
             
-            styles = getSampleStyleSheet()
-            style_title = ParagraphStyle('Title', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=18, textColor=colors.HexColor('#2C3E50'), alignment=1)
-            style_subtitle = ParagraphStyle('Subtitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor('#997A38'), alignment=1, spaceAfter=15)
-            style_heading2 = ParagraphStyle('Heading2', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=12, textColor=colors.HexColor('#2C3E50'), spaceBefore=10, spaceAfter=5)
-            style_body = ParagraphStyle('Body', parent=styles['Normal'], fontName='Helvetica', fontSize=10, textColor=colors.HexColor('#333333'), spaceAfter=6, leading=14)
+            href = f'<a href="data:text/html;base64,{b64}" download="{nome_arquivo}" style="text-decoration: none;"><button style="background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 0.7rem 1.5rem; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Baixar Laudo Oficial</button></a>'
             
-            story.append(Paragraph("Samile Schmitt", style_title))
-            story.append(Paragraph("A D V O C A C I A", style_subtitle))
-            story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#C5A059'), spaceAfter=15))
-            
-            story.append(Paragraph("Parecer Tecnico Previdenciario / Tributario - Isencao de IR (Lei 7.713/88)", style_heading2))
-            story.append(Paragraph(f"<b>Data da Analise:</b> {st.session_state['data_analise']}", style_body))
-            story.append(Paragraph(f"<b>Cliente / Segurado:</b> {st.session_state['nome_editado']}", style_body))
-            story.append(Paragraph(f"<b>Patologia / CID:</b> {st.session_state['patologia_editada']}", style_body))
-            story.append(Paragraph(f"<b>Inicio da Enfermidade:</b> {st.session_state['data_editada']}", style_body))
-            story.append(Spacer(1, 10))
-            
-            story.append(Paragraph("<b>Demonstrativo Consolidado de Creditos Tributarios</b>", style_heading2))
-            
-            tabela_dados = [["Ano", "Rend. Tributavel (R$)", "IR Retido (R$)", "Credito Restituivel (R$)"]]
-            for row in st.session_state['df_final'].values.tolist():
-                tabela_dados.append([str(row[0]), f"R$ {row[1]:,.2f}", f"R$ {row[3]:,.2f}", f"R$ {row[4]:,.2f}"])
-                
-            t = Table(tabela_dados, colWidths=[50, 160, 140, 190])
-            t.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2C3E50')),
-                ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0,0), (-1,-1), 9),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-                ('TOPPADDING', (0,0), (-1,-1), 6),
-                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#EAE6DF')),
-            ]))
-            story.append(t)
-            story.append(Spacer(1, 10))
-            
-            story.append(Paragraph(f"<b>MONTANTE TOTAL DE RESTITUICAO APURADO: R$ {st.session_state['soma_total_geral']:,.2f}</b>", style_heading2))
-            story.append(Spacer(1, 5))
-            
-            story.append(Paragraph("<b>Fundamentacao Tecnica e Memoria de Calculo</b>", style_heading2))
-            story.append(Paragraph("A presente auditoria fiscal fundamenta-se estritamente no artigo 6o, inciso XIV, da <b>Lei no 7.713/88</b>, que assegura a isencao tributaria integral sobre proventos percebidos por portadores de molestia grave a partir da comprovacao medica da enfermidade.", style_body))
-            
-            for item in st.session_state['memoria']:
-                texto_mem = f"• <b>Exercicio {item['ano']}</b>: Rendimento de R$ {item['rend']:,.2f} (Teto Legal de Referencia: R$ {item['teto']:,.2f}) — IR Retido Indevido: <b>R$ {item['restituicao']:,.2f}</b>."
-                story.append(Paragraph(texto_mem, style_body))
-                
-            story.append(Spacer(1, 10))
-            story.append(Paragraph("<b>Conclusao Estratégica:</b> O caso apresenta viabilidade jurídica plena, totalizando créditos passíveis de repetição de indébito apurados com exatidão.", style_body))
-            
-            doc.build(story)
-            pdf_data = buffer.getvalue()
-            
-            st.download_button(
-                label="📥 Baixar Laudo Oficial em PDF",
-                data=pdf_data,
-                file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.pdf",
-                mime="application/pdf",
-                type="primary"
-            )
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(href, unsafe_allow_html=True)
 else:
     st.markdown("""
         <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 20px;">
             <h3 style="color: #2C3E50;">Sistema de Isenção de IR</h3>
-            <p style="color: #666;">Insira sua chave de API na barra lateral e faça o upload dos documentos fiscais para iniciar a auditoria técnica.</p>
+            <p style="color: #666;">Insira sua chave de API na barra lateral e faça o upload dos documentos fiscais para iniciar a auditoria.</p>
         </div>
     """, unsafe_allow_html=True)
