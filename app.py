@@ -3,8 +3,12 @@ import pandas as pd
 import pypdf
 import google.generativeai as genai
 import json
-import base64
+import io
 from datetime import datetime, timedelta, timezone
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 # Configuração da Página
 st.set_page_config(
@@ -204,7 +208,6 @@ if arquivos_pdf and api_key_input:
             st.session_state['patologia_editada'] = patologia_editada
             st.session_state['data_editada'] = data_editada
             
-            # Ajuste correto para o fuso horário de Brasília (UTC-3)
             fuso_br = timezone(timedelta(hours=-3))
             st.session_state['data_analise'] = datetime.now(fuso_br).strftime("%d/%m/%Y às %H:%M")
 
@@ -235,70 +238,71 @@ if arquivos_pdf and api_key_input:
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 
-            # Conteúdo HTML profissional para o PDF
-            html_relatorio = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body {{ font-family: 'Helvetica', Arial, sans-serif; color: #2C3E50; padding: 40px; }}
-        .header {{ text-align: center; border-bottom: 2px solid #C5A059; padding-bottom: 20px; margin-bottom: 30px; }}
-        .header h1 {{ margin: 0; font-family: 'Georgia', serif; color: #2C3E50; font-size: 26px; }}
-        .header p {{ color: #997A38; font-weight: bold; letter-spacing: 4px; font-size: 13px; margin-top: 5px; }}
-        .sub {{ color: #555; font-size: 12px; margin-top: 5px; }}
-        .info-box {{ background: #FDFCFB; padding: 20px; border-radius: 8px; border: 1px solid #EAE6DF; border-left: 5px solid #C5A059; margin-bottom: 30px; }}
-        .info-box p {{ margin: 8px 0; font-size: 14px; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; }}
-        th, td {{ border: 1px solid #EAE6DF; padding: 12px; text-align: left; font-size: 13px; }}
-        th {{ background-color: #2C3E50; color: white; }}
-        .total-box {{ font-size: 18px; font-weight: bold; color: #2C3E50; text-align: right; margin-top: 20px; padding: 15px; background: #F4F6F7; border-radius: 6px; }}
-        .parecer-box {{ background: #F9F9F9; border-left: 4px solid #C5A059; padding: 20px; margin-top: 30px; border-radius: 6px; font-size: 13px; line-height: 1.6; }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>Samile Schmitt</h1>
-        <p>A D V O C A C I A</p>
-        <div class="sub">Parecer Técnico Previdenciário / Tributário — Isenção de IR (Lei 7.713/88)</div>
-    </div>
-    
-    <div class="info-box">
-        <p><b>Data da Análise:</b> {st.session_state['data_analise']}</p>
-        <p><b>Cliente / Segurado:</b> {st.session_state['nome_editado']}</p>
-        <p><b>Patologia / CID:</b> {st.session_state['patologia_editada']}</p>
-        <p><b>Início da Enfermidade:</b> {st.session_state['data_editada']}</p>
-    </div>
-
-    <h3 style="color: #2C3E50; border-bottom: 1px solid #ddd; padding-bottom: 8px;">Demonstrativo Consolidado de Créditos Tributários</h3>
-    {st.session_state['df_final'].to_html(index=False, classes='table')}
-    
-    <div class="total-box">
-        Montante Total de Restituição Apurado: R$ {st.session_state['soma_total_geral']:,.2f}
-    </div>
-    
-    <div class="spec-box" style="margin-top: 20px; padding: 15px; background: #FFF; border: 1px solid #EAE6DF; border-radius: 6px;">
-        <h4 style="margin-top:0; color:#2C3E50;">Memória Analítica e Teto Anual de Isenção</h4>
-        <ul>
-            {"".join([f"<li><b>Exercício {item['ano']}</b>: Rendimento de R$ {item['rend']:,.2f} (Teto Legal de Referência: R$ {item['teto']:,.2f}) — IR Retido Indevido: <b>R$ {item['restituicao']:,.2f}</b></li>" for item in st.session_state['memoria']])}
-        </ul>
-    </div>
-
-    <div class="parecer-box">
-        <h3 style="margin-top:0; color:#2C3E50;">Fundamentação Técnica e Conclusão</h3>
-        <p>A presente auditoria fiscal fundamenta-se estritamente no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que assegura a isenção tributária integral sobre proventos percebidos por portadores de moléstia grave a partir da comprovação médica da enfermidade ({st.session_state['data_editada']}).</p>
-        <p><b>Conclusão Estratégica:</b> O caso apresenta viabilidade jurídica plena, totalizando créditos passíveis de repetição de indébito de <b>R$ {st.session_state['soma_total_geral']:,.2f}</b>.</p>
-    </div>
-</body>
-</html>"""
-
-            # Codificação em base64 para download direto do PDF
-            b64 = base64.b64encode(html_relatorio.encode()).decode()
-            nome_arquivo = f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.pdf"
+            # Geração do PDF Real usando ReportLab
+            buffer = io.BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+            story = []
             
-            href = f'<a href="data:application/pdf;base64,{b64}" download="{nome_arquivo}" style="text-decoration: none;"><button style="background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 0.7rem 1.5rem; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Baixar Laudo Oficial em PDF</button></a>'
+            styles = getSampleStyleSheet()
+            style_title = ParagraphStyle('Title', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=18, textColor=colors.HexColor('#2C3E50'), alignment=1)
+            style_subtitle = ParagraphStyle('Subtitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor('#997A38'), alignment=1, spaceAfter=15)
+            style_heading2 = ParagraphStyle('Heading2', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=12, textColor=colors.HexColor('#2C3E50'), spaceBefore=10, spaceAfter=5)
+            style_body = ParagraphStyle('Body', parent=styles['Normal'], fontName='Helvetica', fontSize=10, textColor=colors.HexColor('#333333'), spaceAfter=6, leading=14)
             
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown(href, unsafe_allow_html=True)
+            story.append(Paragraph("Samile Schmitt", style_title))
+            story.append(Paragraph("A D V O C A C I A", style_subtitle))
+            story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#C5A059'), spaceAfter=15))
+            
+            story.append(Paragraph("Parecer Tecnico Previdenciario / Tributario - Isencao de IR (Lei 7.713/88)", style_heading2))
+            story.append(Paragraph(f"<b>Data da Analise:</b> {st.session_state['data_analise']}", style_body))
+            story.append(Paragraph(f"<b>Cliente / Segurado:</b> {st.session_state['nome_editado']}", style_body))
+            story.append(Paragraph(f"<b>Patologia / CID:</b> {st.session_state['patologia_editada']}", style_body))
+            story.append(Paragraph(f"<b>Inicio da Enfermidade:</b> {st.session_state['data_editada']}", style_body))
+            story.append(Spacer(1, 10))
+            
+            story.append(Paragraph("<b>Demonstrativo Consolidado de Creditos Tributarios</b>", style_heading2))
+            
+            tabela_dados = [["Ano", "Rend. Tributavel (R$)", "IR Retido (R$)", "Credito Restituivel (R$)"]]
+            for row in st.session_state['df_final'].values.tolist():
+                tabela_dados.append([str(row[0]), f"R$ {row[1]:,.2f}", f"R$ {row[3]:,.2f}", f"R$ {row[4]:,.2f}"])
+                
+            t = Table(tabela_dados, colWidths=[50, 160, 140, 190])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2C3E50')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,-1), 9),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                ('TOPPADDING', (0,0), (-1,-1), 6),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#EAE6DF')),
+            ]))
+            story.append(t)
+            story.append(Spacer(1, 10))
+            
+            story.append(Paragraph(f"<b>MONTANTE TOTAL DE RESTITUICAO APURADO: R$ {st.session_state['soma_total_geral']:,.2f}</b>", style_heading2))
+            story.append(Spacer(1, 5))
+            
+            story.append(Paragraph("<b>Fundamentacao Tecnica e Memoria de Calculo</b>", style_heading2))
+            story.append(Paragraph("A presente auditoria fiscal fundamenta-se estritamente no artigo 6o, inciso XIV, da <b>Lei no 7.713/88</b>, que assegura a isencao tributaria integral sobre proventos percebidos por portadores de molestia grave a partir da comprovacao medica da enfermidade.", style_body))
+            
+            for item in st.session_state['memoria']:
+                texto_mem = f"• <b>Exercicio {item['ano']}</b>: Rendimento de R$ {item['rend']:,.2f} (Teto Legal de Referencia: R$ {item['teto']:,.2f}) — IR Retido Indevido: <b>R$ {item['restituicao']:,.2f}</b>."
+                story.append(Paragraph(texto_mem, style_body))
+                
+            story.append(Spacer(1, 10))
+            story.append(Paragraph("<b>Conclusao Estratégica:</b> O caso apresenta viabilidade jurídica plena, totalizando créditos passíveis de repetição de indébito apurados com exatidão.", style_body))
+            
+            doc.build(story)
+            pdf_data = buffer.getvalue()
+            
+            st.download_button(
+                label="📥 Baixar Laudo Oficial em PDF",
+                data=pdf_data,
+                file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.pdf",
+                mime="application/pdf",
+                type="primary"
+            )
 else:
     st.markdown("""
         <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 20px;">
