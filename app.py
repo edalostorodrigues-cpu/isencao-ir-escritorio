@@ -65,6 +65,17 @@ with st.sidebar:
         accept_multiple_files=True
     )
 
+def extrair_texto_pdfs(files):
+    texto_total = ""
+    for file in files:
+        try:
+            leitor = pypdf.PdfReader(file)
+            for pagina in leitor.pages:
+                texto_total += pagina.extract_text() + "\n"
+        except Exception as e:
+            st.warning(f"⚠️ Aviso: Falha ao ler o arquivo '{file.name}'.")
+    return texto_total
+
 lista_cids = [
     "C20 - Neoplasia Maligna (Reto / Intestino)",
     "C50 - Neoplasia Maligna de Mama",
@@ -78,11 +89,10 @@ lista_cids = [
     "Outro / Digitação Manual"
 ]
 
-# Inicializa explicitamente os valores padrão para TODOS os anos (incluindo 2023)
 if 'valores_anos' not in st.session_state:
     st.session_state['nome_cliente_auto'] = "PAULO IRINEU FREITAS COLARES"
     st.session_state['valores_anos'] = {
-        "2023": {"rend": 30000.00, "ir": 250.00}, # Valor base de exemplo para 2023 (editável)
+        "2023": {"rend": 30000.00, "ir": 250.00},
         "2024": {"rend": 69797.83, "ir": 461.38},
         "2025": {"rend": 76301.60, "ir": 507.67}
     }
@@ -127,12 +137,11 @@ if 'valores_anos' in st.session_state:
             ir_retido = vals["ir"]
             teto = tetos_isencao_anual.get(ano, 24511.92)
             
-            # Ponderação temporal exata para 2023 (a partir de 11/05/2023)
             if ano == 2023:
-                fator_temporal = (235 / 365) # Proporção dos dias de maio a dezembro pós-laudo
+                fator_temporal = (235 / 365)
                 restituicao = ir_retido * fator_temporal
             else:
-                restituicao = ir_retido # Anos subsequentes integrais
+                restituicao = ir_retido
                 
             soma_total += restituicao
             
@@ -172,6 +181,7 @@ if 'valores_anos' in st.session_state:
         st.dataframe(st.session_state['df_final'], use_container_width=True)
         st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {st.session_state['soma_total']:,.2f}")
         
+        # HTML do relatório com script embutido para imprimir/salvar em PDF com um clique de forma nativa e profissional
         html_relatorio = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -187,50 +197,4 @@ if 'valores_anos' in st.session_state:
         th, td {{ border: 1px solid #EAE6DF; padding: 12px; text-align: left; font-size: 13px; }}
         th {{ background-color: #2C3E50; color: white; }}
         .total-box {{ font-size: 18px; font-weight: bold; color: #2C3E50; text-align: right; margin-top: 20px; padding: 15px; background: #F4F6F7; border-radius: 6px; }}
-        .parecer-box {{ background: #F9F9F9; border-left: 4px solid #C5A059; padding: 20px; margin-top: 30px; border-radius: 6px; font-size: 13px; line-height: 1.6; }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>Samile Schmitt</h1>
-        <p>A D V O C A C I A</p>
-        <div class="sub">Parecer Técnico Previdenciário / Tributário — Isenção de IR (Lei 7.713/88)</div>
-    </div>
-    
-    <div class="info-box">
-        <p><b>Data da Análise:</b> {st.session_state['data_analise']}</p>
-        <p><b>Cliente / Segurado:</b> {st.session_state['nome_editado']}</p>
-        <p><b>Patologia / CID:</b> {st.session_state['patologia_editada']}</p>
-        <p><b>Início da Enfermidade (Marco Inicial):</b> {st.session_state['data_editada']}</p>
-    </div>
-
-    <h3 style="color: #2C3E50; border-bottom: 1px solid #ddd; padding-bottom: 8px;">Demonstrativo Consolidado de Créditos Tributários</h3>
-    {st.session_state['df_final'].to_html(index=False, classes='table')}
-    
-    <div class="total-box">
-        Montante Total de Restituição Apurado: R$ {st.session_state['soma_total']:,.2f}
-    </div>
-    
-    <div class="parecer-box">
-        <h3 style="margin-top:0; color:#2C3E50;">Fundamentação Técnica, Marco Temporal e Memória de Cálculo</h3>
-        <p>A presente auditoria fiscal fundamenta-se estritamente no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que assegura a isenção tributária integral sobre proventos percebidos por portadores de moléstia grave a partir da comprovação médica da enfermidade ({st.session_state['data_editada']}).</p>
-        <p><b>Ponderação Temporal:</b> Para o exercício de 2023, aplicou-se a proporção temporal a partir da data do laudo médico (11/05/2023) até o encerramento do exercício. Os exercícios subsequentes (2024 e 2025) foram integralmente computados.</p>
-        <p><b>Conclusão Estratégica:</b> O caso apresenta viabilidade jurídica plena, totalizando créditos passíveis de repetição de indébito de <b>R$ {st.session_state['soma_total']:,.2f}</b>.</p>
-    </div>
-</body>
-</html>"""
-
-        b64 = base64.b64encode(html_relatorio.encode()).decode()
-        nome_arquivo = f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html"
-        
-        href = f'<a href="data:text/html;base64,{b64}" download="{nome_arquivo}" style="text-decoration: none;"><button style="background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 0.7rem 1.5rem; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Baixar Laudo Oficial</button></a>'
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(href, unsafe_allow_html=True)
-else:
-    st.markdown("""
-        <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 20px;">
-            <h3 style="color: #2C3E50;">Sistema de Isenção de IR</h3>
-            <p style="color: #666;">Insira sua chave de API na barra lateral e faça o upload dos documentos fiscais para iniciar a auditoria.</p>
-        </div>
-    """, unsafe_allow_html=True)
+        .parecer-box {{ background:
