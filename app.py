@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilização CSS para deixar a interface refinada e corporativa
+# Estilização CSS para deixar a interface refinada, elegante e corporativa
 st.markdown("""
     <style>
     .main {
@@ -40,17 +40,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Cabeçalho Principal com o Logotipo Grande do Escritório
-col_logo1, col_logo2, col_logo3 = st.columns([1, 1.5, 1])
-with col_logo2:
-    # Exibe a imagem oficial do S com a balança em destaque no topo
-    st.image("image_5edb57.png", width=180)
-
+# Cabeçalho Principal com o Emblema do Escritório em Destaque
 st.markdown("""
-    <div style="text-align: center; padding: 0px 0 20px 0;">
-        <h2 style="color: #2C3E50; font-family: 'Georgia', serif; margin-bottom: 0;">Samile Schmitt</h2>
-        <p style="letter-spacing: 4px; color: #997A38; font-size: 13px; font-weight: bold; margin-top: 5px;">A D V O C A C I A</p>
-        <hr style="width: 120px; border: 1px solid #C5A059; margin: 15px auto;">
+    <div style="text-align: center; padding: 10px 0 20px 0;">
+        <div style="font-size: 55px; color: #C5A059; margin-bottom: -10px; text-shadow: 1px 2px 4px rgba(0,0,0,0.1);">⚖️ <b>Ⓢ</b></div>
+        <h2 style="color: #2C3E50; font-family: 'Georgia', serif; margin-top: 10px; margin-bottom: 0;">Samile Schmitt</h2>
+        <p style="letter-spacing: 5px; color: #997A38; font-size: 13px; font-weight: bold; margin-top: 5px;">A D V O C A C I A</p>
+        <hr style="width: 140px; border: 1px solid #C5A059; margin: 15px auto;">
         <h4 style="color: #555; font-weight: normal; font-size: 15px; margin-top: 5px;">Módulo de Análise Inteligente e Cálculo de Isenção de IR (Doença Grave)</h4>
     </div>
 """, unsafe_allow_html=True)
