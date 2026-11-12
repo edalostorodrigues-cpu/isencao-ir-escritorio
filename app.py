@@ -1,8 +1,12 @@
 import streamlit as st
 import pandas as pd
 import pypdf
-import base64
+import io
 from datetime import datetime, timedelta, timezone
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 # Configuração da Página
 st.set_page_config(
@@ -180,51 +184,67 @@ if 'valores_anos' in st.session_state:
         st.dataframe(st.session_state['df_final'], use_container_width=True)
         st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {st.session_state['soma_total']:,.2f}")
         
-        # HTML estruturado com script de impressão direta optimizada para PDF
-        html_relatorio = (
-            "<!DOCTYPE html><html><head><meta charset='utf-8'>"
-            "<style>"
-            "body { font-family: 'Helvetica', Arial, sans-serif; color: #2C3E50; padding: 40px; }"
-            ".header { text-align: center; border-bottom: 2px solid #C5A059; padding-bottom: 20px; margin-bottom: 30px; }"
-            ".header h1 { margin: 0; font-family: 'Georgia', serif; color: #2C3E50; font-size: 26px; }"
-            ".header p { color: #997A38; font-weight: bold; letter-spacing: 4px; font-size: 13px; margin-top: 5px; }"
-            ".sub { color: #555; font-size: 12px; margin-top: 5px; }"
-            ".info-box { background: #FDFCFB; padding: 20px; border-radius: 8px; border: 1px solid #EAE6DF; border-left: 5px solid #C5A059; margin-bottom: 30px; }"
-            "table { width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; }"
-            "th, td { border: 1px solid #EAE6DF; padding: 12px; text-align: left; font-size: 13px; }"
-            "th { background-color: #2C3E50; color: white; }"
-            ".total-box { font-size: 18px; font-weight: bold; color: #2C3E50; text-align: right; margin-top: 20px; padding: 15px; background: #F4F6F7; border-radius: 6px; }"
-            ".parecer-box { background: #F9F9F9; border-left: 4px solid #C5A059; padding: 20px; margin-top: 30px; border-radius: 6px; font-size: 13px; line-height: 1.6; }"
-            "@media print { .no-print { display: none; } body { padding: 0; } }"
-            "</style></head><body>"
-            "<div style='text-align: center; margin-bottom: 30px;' class='no-print'>"
-            "<button onclick='window.print()' style='background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 12px 25px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>🖨️ Salvar Diretamente em PDF</button>"
-            "</div>"
-            "<div class='header'><h1>Samile Schmitt</h1><p>A D V O C A C I A</p><div class='sub'>Parecer Técnico Previdenciário / Tributário — Isenção de IR (Lei 7.713/88)</div></div>"
-            "<div class='info-box'>"
-            f"<p><b>Data da Análise:</b> {st.session_state['data_analise']}</p>"
-            f"<p><b>Cliente / Segurado:</b> {st.session_state['nome_editado']}</p>"
-            f"<p><b>Patologia / CID:</b> {st.session_state['patologia_editada']}</p>"
-            f"<p><b>Início da Enfermidade (Marco Inicial):</b> {st.session_state['data_editada']}</p>"
-            "</div>"
-            "<h3 style='color: #2C3E50; border-bottom: 1px solid #ddd; padding-bottom: 8px;'>Demonstrativo Consolidado de Créditos Tributários</h3>"
-            + st.session_state['df_final'].to_html(index=False, classes='table') +
-            f"<div class='total-box'>Montante Total de Restituição Apurado: R$ {st.session_state['soma_total']:,.2f}</div>"
-            "<div class='parecer-box'>"
-            "<h3 style='margin-top:0; color:#2C3E50;'>Fundamentação Técnica, Marco Temporal e Memória de Cálculo</h3>"
-            f"<p>A presente auditoria fiscal fundamenta-se estritamente no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que assegura a isenção tributária integral sobre proventos percebidos por portadores de moléstia grave a partir da comprovação médica da enfermidade ({st.session_state['data_editada']}).</p>"
-            "<p><b>Ponderação Temporal:</b> Para o exercício de 2023, aplicou-se a proporção temporal a partir da data do laudo médico (11/05/2023) até o encerramento do exercício. Os exercícios subsequentes (2024 e 2025) foram integralmente computados.</p>"
-            f"<p><b>Conclusão Estratégica:</b> O caso apresenta viabilidade jurídica plena, totalizando créditos passíveis de repetição de indébito de <b>R$ {st.session_state['soma_total']:,.2f}</b>.</p>"
-            "</div></body></html>"
-        )
-
-        b64 = base64.b64encode(html_relatorio.encode()).decode()
-        nome_arquivo = f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.pdf"
+        # Geração do PDF Real utilizando ReportLab
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+        story = []
         
-        href = f'<a href="data:application/pdf;base64,{b64}" download="{nome_arquivo}" style="text-decoration: none;"><button style="background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 0.7rem 1.5rem; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Baixar Laudo Oficial em PDF</button></a>'
+        styles = getSampleStyleSheet()
+        style_title = ParagraphStyle('Title', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=18, textColor=colors.HexColor('#2C3E50'), alignment=1)
+        style_subtitle = ParagraphStyle('Subtitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor('#997A38'), alignment=1, spaceAfter=15)
+        style_heading2 = ParagraphStyle('Heading2', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=12, textColor=colors.HexColor('#2C3E50'), spaceBefore=10, spaceAfter=5)
+        style_body = ParagraphStyle('Body', parent=styles['Normal'], fontName='Helvetica', fontSize=10, textColor=colors.HexColor('#333333'), spaceAfter=6, leading=14)
+        
+        story.append(Paragraph("Samile Schmitt", style_title))
+        story.append(Paragraph("A D V O C A C I A", style_subtitle))
+        story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#C5A059'), spaceAfter=15))
+        
+        story.append(Paragraph("Parecer Técnico Previdenciário / Tributário - Isenção de IR (Lei 7.713/88)", style_heading2))
+        story.append(Paragraph(f"<b>Data da Análise:</b> {st.session_state['data_analise']}", style_body))
+        story.append(Paragraph(f"<b>Cliente / Segurado:</b> {st.session_state['nome_editado']}", style_body))
+        story.append(Paragraph(f"<b>Patologia / CID:</b> {st.session_state['patologia_editada']}", style_body))
+        story.append(Paragraph(f"<b>Início da Enfermidade (Marco Inicial):</b> {st.session_state['data_editada']}", style_body))
+        story.append(Spacer(1, 10))
+        
+        story.append(Paragraph("<b>Demonstrativo Consolidado de Créditos Tributários</b>", style_heading2))
+        
+        tabela_dados = [["Ano", "Rend. Tributável (R$)", "IR Retido (R$)", "Crédito Restituível (R$)"]]
+        for row in st.session_state['df_final'].values.tolist():
+            tabela_dados.append([str(row[0]), f"R$ {row[1]:,.2f}", f"R$ {row[3]:,.2f}", f"R$ {row[4]:,.2f}"])
+            
+        t = Table(tabela_dados, colWidths=[50, 160, 140, 190])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2C3E50')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 9),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+            ('TOPPADDING', (0,0), (-1,-1), 6),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#EAE6DF')),
+        ]))
+        story.append(t)
+        story.append(Spacer(1, 10))
+        
+        story.append(Paragraph(f"<b>MONTANTE TOTAL DE RESTITUIÇÃO APURADO: R$ {st.session_state['soma_total']:,.2f}</b>", style_heading2))
+        story.append(Spacer(1, 5))
+        
+        story.append(Paragraph("<b>Fundamentação Técnica, Marco Temporal e Memória de Cálculo</b>", style_heading2))
+        story.append(Paragraph(f"A presente auditoria fiscal fundamenta-se estritamente no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que assegura a isenção tributária integral sobre proventos percebidos por portadores de moléstia grave a partir da comprovação médica da enfermidade ({st.session_state['data_editada']}).", style_body))
+        story.append(Paragraph("<b>Ponderação Temporal:</b> Para o exercício de 2023, aplicou-se a proporção temporal a partir da data do laudo médico (11/05/2023) até o encerramento do exercício. Os exercícios subsequentes (2024 e 2025) foram integralmente computados.", style_body))
+        story.append(Paragraph(f"<b>Conclusão Estratégica:</b> O caso apresenta viabilidade jurídica plena, totalizando créditos passíveis de repetição de indébito de <b>R$ {st.session_state['soma_total']:,.2f}</b>.", style_body))
+        
+        doc.build(story)
+        pdf_data = buffer.getvalue()
         
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(href, unsafe_allow_html=True)
+        st.download_button(
+            label="📥 Baixar Laudo Oficial em PDF",
+            data=pdf_data,
+            file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.pdf",
+            mime="application/pdf",
+            type="primary"
+        )
 else:
     st.markdown("""
         <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 20px;">
