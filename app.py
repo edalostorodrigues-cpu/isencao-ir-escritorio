@@ -65,17 +65,6 @@ with st.sidebar:
         accept_multiple_files=True
     )
 
-def extrair_texto_pdfs(files):
-    texto_total = ""
-    for file in files:
-        try:
-            leitor = pypdf.PdfReader(file)
-            for pagina in leitor.pages:
-                texto_total += pagina.extract_text() + "\n"
-        except Exception as e:
-            st.warning(f"⚠️ Aviso: Falha ao ler o arquivo '{file.name}'.")
-    return texto_total
-
 lista_cids = [
     "C20 - Neoplasia Maligna (Reto / Intestino)",
     "C50 - Neoplasia Maligna de Mama",
@@ -89,11 +78,11 @@ lista_cids = [
     "Outro / Digitação Manual"
 ]
 
-# Inicializa com os valores padrão de referência para o caso
+# Inicializa explicitamente os valores padrão para TODOS os anos (incluindo 2023)
 if 'valores_anos' not in st.session_state:
     st.session_state['nome_cliente_auto'] = "PAULO IRINEU FREITAS COLARES"
     st.session_state['valores_anos'] = {
-        "2023": {"rend": 35000.00, "ir": 300.00}, # Valor base de exemplo para 2023 (proporcionalizado pós-maio)
+        "2023": {"rend": 30000.00, "ir": 250.00}, # Valor base de exemplo para 2023 (editável)
         "2024": {"rend": 69797.83, "ir": 461.38},
         "2025": {"rend": 76301.60, "ir": 507.67}
     }
@@ -113,7 +102,7 @@ if 'valores_anos' in st.session_state:
         
     st.markdown("---")
     st.markdown("#### ✏️ Valores e Ponderação Temporal (Laudo a partir de 11/05/2023)")
-    st.info("💡 **Diretriz Técnica:** Para o ano de 2023, o sistema considera proporcionalmente apenas o período posterior à emissão do laudo (maio a dezembro). Os valores são totalmente editáveis.")
+    st.info("💡 **Diretriz Técnica:** Para 2023, o sistema aplica automaticamente a proporção temporal considerando apenas o período posterior ao laudo (maio a dezembro). Todos os campos são 100% editáveis.")
 
     dados_validados = {}
     cols_ano = st.columns(3)
@@ -138,12 +127,12 @@ if 'valores_anos' in st.session_state:
             ir_retido = vals["ir"]
             teto = tetos_isencao_anual.get(ano, 24511.92)
             
-            # Ponderação temporal para o ano de 2023 (início em 11/05/2023 -> ~7 meses de direito / 64% do ano)
+            # Ponderação temporal exata para 2023 (a partir de 11/05/2023)
             if ano == 2023:
-                fator_temporal = (235 / 365) # Aprox. dias de maio a dezembro a partir de 11/05
+                fator_temporal = (235 / 365) # Proporção dos dias de maio a dezembro pós-laudo
                 restituicao = ir_retido * fator_temporal
             else:
-                restituicao = ir_retido # Anos integrais subsequentes
+                restituicao = ir_retido # Anos subsequentes integrais
                 
             soma_total += restituicao
             
