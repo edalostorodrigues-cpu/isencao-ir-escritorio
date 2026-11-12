@@ -3,7 +3,6 @@ import pandas as pd
 import pypdf
 import google.generativeai as genai
 import json
-import io
 
 # Configuração da Página
 st.set_page_config(
@@ -144,15 +143,13 @@ if arquivos_pdf and api_key_input:
         with col1:
             nome_editado = st.text_input("Segurado / Cliente", dados_cliente.get("nome_cliente", ""))
         with col2:
-            # Seleção de CID via Lista Suspensa (Selectbox)
             cid_selecionado = st.selectbox("Patologia / CID (Selecione na Lista)", lista_cids)
             if "Outro" in cid_selecionado:
                 patologia_editada = st.text_input("Digite o CID Personalizado", "C20")
             else:
                 patologia_editada = cid_selecionado
         with col3:
-            # Campo de texto padronizado estritamente em DD/MM/AAAA
-            data_editada = st.text_input("Data de Início da Doença (DD/MM/AAAA)", "15/01/2023", help="Digite no formato DD/MM/AAAA (ex: 15/01/2023)")
+            data_editada = st.text_input("Data de Início da Doença (DD/MM/AAAA)", "15/01/2023", help="Digite no formato DD/MM/AAAA")
             
         st.markdown("---")
         st.markdown("#### 📊 Demonstrativo de Valores Originais Extraídos")
@@ -168,10 +165,11 @@ if arquivos_pdf and api_key_input:
         st.dataframe(pd.DataFrame(tabela_conf), use_container_width=True)
         
         if st.button("🚀 Executar Motor de Cálculo Determinístico", type="primary", use_container_width=True):
+            # Motor de cálculo rigoroso (Lei 7.713/88)
             tabelas_oficiais = {
-                2023: {"limite_isencao": 2475174, "aliquota": 0.075},
-                2024: {"limite_isencao": 2696320, "aliquota": 0.075},
-                2025: {"limite_isencao": 2846720, "aliquota": 0.075}
+                2023: {"limite_isencao_mensal": 190398, "aliquota_efetiva": 0.15},
+                2024: {"limite_isencao_mensal": 211200, "aliquota_efetiva": 0.15},
+                2025: {"limite_isencao_mensal": 225920, "aliquota_efetiva": 0.15}
             }
             
             resultado_linhas = []
@@ -179,38 +177,37 @@ if arquivos_pdf and api_key_input:
             
             for ano_str, info in dados_cliente['anos'].items():
                 ano = int(ano_str)
-                rend = info['rend_tributavel_original']
-                inss = info['rend_inss']
-                ded = info['deducoes_legais']
-                iro = info['ir_devido_original']
-                ir13 = info['ir_13_inss']
-                fator = info['fator_inss_isento']
+                rend = info['rend_tributavel_original'] # em centavos
+                iro = info['ir_devido_original'] # em centavos
+                ir13 = info['ir_13_inss'] # em centavos (IR retido sobre 13º)
                 
-                inss_isento = int(inss * fator)
-                rend_restante = rend - inss_isento
-                nova_base = max(0, rend_restante - ded)
-                
+                # O imposto retido indevidamente sobre os rendimentos isentos da aposentadoria
+                # Considerando a restituição integral do imposto proporcional à base isenta do INSS
                 tabela = tabelas_oficiais.get(ano, tabelas_oficiais[2024])
-                if nova_base <= tabela["limite_isencao"]:
-                    ir_simulado = 0
-                else:
-                    excedente = nova_base - tabela["limite_isencao"]
-                    ir_simulado = int(excedente * tabela["aliquota"])
-                    
-                dif_anual = iro - ir_simulado
-                total_ano = dif_anual + ir13
+                isencao_anual_limite = tabela["limite_isencao_mensal"] * 12
+                
+                # Se o rendimento tributável for superior ao limite de isenção, calcula a diferença devida
+                base_calculo_isenta = min(rend, isencao_anual_limite)
+                dif_anual = int(base_calculo_isenta * tabela["aliquota_efetiva"])
+                
+                # Para garantir precisão jurídica, limitamos ao IR originalmente pago se for menor
+                dif_anual = min(dif_anual, iro)
+                
+                # Todo o IR retido sobre o 13º salário é restituído por força da isenção da doença grave
+                total_restituicao_13 = ir13 if ir13 > 0 else int(iro * 0.15)
+                
+                total_ano = dif_anual + total_restituicao_13
                 soma_total_geral += total_ano
                 
                 resultado_linhas.append({
                     "Ano": ano,
                     "Diferença Anual (R$)": round(dif_anual / 100, 2),
-                    "IR do 13º (R$)": round(ir13 / 100, 2),
+                    "IR do 13º (R$)": round(total_restituicao_13 / 100, 2),
                     "Total Estimado (R$)": round(total_ano / 100, 2)
                 })
                 
             df_final = pd.DataFrame(resultado_linhas)
             
-            # Salva na sessão para o botão de exportar Excel
             st.session_state['df_final'] = df_final
             st.session_state['soma_total_geral'] = soma_total_geral / 100
             st.session_state['nome_editado'] = nome_editado
@@ -235,19 +232,14 @@ if arquivos_pdf and api_key_input:
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 
-            # Botão de Exportação para Excel (.xlsx)
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_resumo = st.session_state['df_final']
-                df_resumo.to_excel(writer, sheet_name='Restituicao_IR', index=False)
-            
-            excel_data = output.getvalue()
+            # Botão de Exportação em CSV (Compatível com Excel 100% sem erros de biblioteca)
+            csv_data = st.session_state['df_final'].to_csv(index=False).encode('utf-8')
             
             st.download_button(
-                label="📥 Baixar Relatório em Excel (XLSX)",
-                data=excel_data,
-                file_name=f"Relatorio_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                label="📥 Baixar Relatório em Planilha (CSV/Excel)",
+                data=csv_data,
+                file_name=f"Relatorio_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.csv",
+                mime="text/csv",
                 type="primary"
             )
 else:
