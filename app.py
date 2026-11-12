@@ -5,24 +5,63 @@ import google.generativeai as genai
 import json
 
 # Configuração da Página
-st.set_page_config(page_title="Sistema de Isenção de IR - Doença Grave", layout="wide")
+st.set_page_config(
+    page_title="Samile Schmitt Advocacia - Sistema de Isenção de IR", 
+    page_icon="⚖️", 
+    layout="wide"
+)
 
-st.title("⚖️ Sistema Interno do Escritório")
-st.subheader("Análise Automatizada de Isenção de IR com Leitura de PDFs por IA")
+# Estilização CSS personalizada para dar o toque corporativo e elegante (Tons de Dourado e Cinza Escuro)
+st.markdown("""
+    <style>
+    .main {
+        background-color: #FAFAFA;
+    }
+    .stButton>button {
+        background: linear-gradient(135deg, #C5A059 0%, #997A38 100%);
+        color: white;
+        font-weight: bold;
+        border: none;
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .stButton>button:hover {
+        background: linear-gradient(135deg, #D4AF37 0%, #B38F42 100%);
+        color: white;
+    }
+    .css-1544g2n {
+        padding-top: 2rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
+# Cabeçalho Elegante do Escritório
+st.markdown("""
+    <div style="text-align: center; padding: 10px 0 20px 0;">
+        <h2 style="color: #2C3E50; font-family: 'Georgia', serif; margin-bottom: 0;">Samile Schmitt</h2>
+        <p style="letter-spacing: 3px; color: #997A38; font-size: 14px; font-weight: bold; margin-top: 5px;">A D V O C A C I A</p>
+        <hr style="width: 100px; border: 1px solid #C5A059; margin: 10px auto;">
+        <h4 style="color: #555; font-weight: normal; margin-top: 5px;">Módulo de Análise Inteligente e Cálculo de Isenção de IR (Doença Grave)</h4>
+    </div>
+""", unsafe_allow_html=True)
+
+# Barra Lateral Profissional
 with st.sidebar:
-    st.header("📂 Importação de Documentos")
-    st.info("Envie os PDFs (IRPF e HISCRE do INSS).")
+    st.markdown("### ⚖️ Painel do Escritório")
+    st.markdown("---")
+    st.info("Envie os documentos fiscais do cliente. O motor de IA estruturará os dados automaticamente.")
     
     # Upload dos PDFs
     arquivos_pdf = st.file_uploader(
-        "Arraste os PDFs do Cliente Aqui", 
+        "Arraste os PDFs do Cliente (IRPF / HISCRE)", 
         type=["pdf"], 
         accept_multiple_files=True
     )
     
+    st.markdown("---")
     # Chave da API do Gemini
-    api_key_input = st.text_input("Chave da API Gemini (Google AI Studio)", type="password", help="Insira sua chave para ativar a extração automática por IA.")
+    api_key_input = st.text_input("Chave da API Gemini", type="password", help="Insira sua chave do Google AI Studio para ativar a IA.")
 
 # Função para extrair texto dos PDFs enviados
 def extrair_texto_pdfs(files):
@@ -39,7 +78,7 @@ def analisar_documentos_com_ia(texto_documentos, api_key):
     model = genai.GenerativeModel('gemini-3.8-flash')
     
     prompt = f"""
-    Você é um assistente jurídico especializado em direito tributário e previdenciário (Lei 7.713/88).
+    Você é um assistente jurídico sênior especializado em direito tributário e previdenciário (Lei 7.713/88).
     Analise o texto extraído dos documentos do cliente abaixo e retorne um JSON estrito com a seguinte estrutura:
     {{
       "nome_cliente": "Nome completo extraído ou 'Não localizado'",
@@ -68,24 +107,24 @@ def analisar_documentos_com_ia(texto_documentos, api_key):
 
 # Área Principal
 if arquivos_pdf and api_key_input:
-    st.success(f"{len(arquivos_pdf)} documento(s) carregado(s) com sucesso!")
+    st.success(f"✨ {len(arquivos_pdf)} documento(s) carregado(s) com sucesso na base segura.")
     
     # Botão para disparar a leitura controlada
-    if st.button("🤖 Iniciar Leitura Automática com IA", type="primary"):
-        with st.spinner("A Inteligência Artificial está lendo os documentos... Aguarde um instante."):
+    if st.button("🤖 Processar Leitura Inteligente com IA", type="primary"):
+        with st.spinner("A Inteligência Artificial está analisando os documentos do cliente..."):
             texto_extraido = extrair_texto_pdfs(arquivos_pdf)
             dados_cliente = analisar_documentos_com_ia(texto_extraido, api_key_input)
             st.session_state['dados_cliente'] = dados_cliente
 
-    # Se já tiver os dados processados na sessão, exibe a tela
+    # Se já tiver os dados processados na sessão, exibe a interface de trabalho
     if 'dados_cliente' in st.session_state and st.session_state['dados_cliente']:
         dados_cliente = st.session_state['dados_cliente']
         
-        st.markdown("### 📋 Dados Identificados nos Documentos")
+        st.markdown("### 📋 Doutrina e Dados Cadastrais do Cliente")
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            nome_editado = st.text_input("Segurado", dados_cliente.get("nome_cliente", ""))
+            nome_editado = st.text_input("Segurado / Cliente", dados_cliente.get("nome_cliente", ""))
         with col2:
             # Opção manual caso o laudo não tenha vindo nos PDFs
             patologia_editada = st.text_input("Patologia / CID (Ajuste Manual)", dados_cliente.get("patologia_cid", "C20 (Neoplasia Maligna)"))
@@ -93,6 +132,8 @@ if arquivos_pdf and api_key_input:
             # Opção manual para a data de início
             data_editada = st.text_input("Data de Início da Doença (Ajuste Manual)", "2023-01-15")
             
+        st.markdown("---")
+        st.markdown("#### 📊 Demonstrativo de Valores Originais Extraídos")
         tabela_conf = []
         for ano, info in dados_cliente['anos'].items():
             tabela_conf.append({
@@ -147,14 +188,25 @@ if arquivos_pdf and api_key_input:
                 
             df_final = pd.DataFrame(resultado_linhas)
             
-            st.success("Análise concluída com sucesso!")
-            st.markdown(f"### 📄 Laudo Técnico para: {nome_editado} | CID: {patologia_editada}")
+            st.success("Cálculo jurídico executado com sucesso!")
+            st.markdown(f"""
+                <div style="background-color: #F4F6F7; padding: 15px; border-left: 4px solid #C5A059; border-radius: 4px; margin-bottom: 20px;">
+                    <h4 style="margin:0; color:#2C3E50;">Relatório de Viabilidade — {nome_editado}</h4>
+                    <p style="margin:5px 0 0 0; color:#555;"><b>Patologia / CID:</b> {patologia_editada} | <b>Início da Enfermidade:</b> {data_editada}</p>
+                </div>
+            """, unsafe_allow_html=True)
+            
             st.dataframe(df_final, use_container_width=True)
             st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {soma_total_geral/100:,.2f}")
             
             if soma_total_geral > 0:
-                st.markdown("🟢 **STATUS:** `VIÁVEL PARA AJUIZAMENTO` — Há direito creditício recuperável.")
+                st.markdown("🟢 **STATUS:** `VIÁVEL PARA AJUIZAMENTO` — Há direito creditício recuperável a favor do segurado.")
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 else:
-    st.info("👈 Insira sua Chave da API do Gemini na barra lateral e faça o upload dos PDFs do cliente para iniciar.")
+    st.markdown("""
+        <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 30px;">
+            <h3 style="color: #2C3E50;">Bem-vindo ao Sistema de Isenção</h3>
+            <p style="color: #666;">Insira sua chave de API na barra lateral e faça o upload dos documentos digitalizados para iniciar a análise jurídica automatizada.</p>
+        </div>
+    """, unsafe_allow_html=True)
