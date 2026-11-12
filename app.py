@@ -52,6 +52,9 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
+# Recupera a chave de API dos segredos do Streamlit (ou pede na lateral se não configurado)
+api_key_config = st.secrets.get("GEMINI_API_KEY", "")
+
 # Barra Lateral Profissional
 with st.sidebar:
     st.markdown("### ⚖️ Painel do Escritório")
@@ -66,8 +69,11 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    # Chave da API do Gemini
-    api_key_input = st.text_input("Chave da API Gemini", type="password", help="Insira sua chave do Google AI Studio para ativar a IA.")
+    if not api_key_config:
+        api_key_input = st.text_input("Chave da API Gemini", type="password", help="Insira sua chave do Google AI Studio.")
+    else:
+        api_key_input = api_key_config
+        st.success("🔒 Chave da API carregada com segurança.")
 
 # Função para extrair texto dos PDFs enviados
 def extrair_texto_pdfs(files):
@@ -227,35 +233,58 @@ if arquivos_pdf and api_key_input:
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 
-            # Geração de Relatório Textual Formatado pronto para Copiar ou Salvar
-            relatorio_texto = f"""
-==================================================
-              SAMILE SCHMITT | ADVOCACIA
-      PARECER TÉCNICO DE VIABILIDADE — LEI 7.713/88
-==================================================
-Data da Análise: {st.session_state['data_analise']}
-Cliente / Segurado: {st.session_state['nome_editado']}
-Patologia / CID: {st.session_state['patologia_editada']}
-Início da Enfermidade: {st.session_state['data_editada']}
---------------------------------------------------
-DEMONSTRATIVO DE RESTITUIÇÃO APURADA:
-{st.session_state['df_final'].to_string(index=False)}
---------------------------------------------------
-VALOR TOTAL ESTIMADO: R$ {st.session_state['soma_total_geral']:,.2f}
-STATUS JURÍDICO: VIÁVEL PARA AJUIZAMENTO
-==================================================
-"""
+            # Geração de Relatório em formato HTML elegante para Impressão/PDF direto pelo navegador
+            html_relatorio = f"""
+            <html>
+            <head>
+                <style>
+                    body {{ font-family: 'Helvetica', Arial, sans-serif; color: #333; padding: 30px; }}
+                    .header {{ text-align: center; border-bottom: 2px solid #C5A059; padding-bottom: 15px; margin-bottom: 20px; }}
+                    .header h2 {{ color: #2C3E50; margin: 0; font-family: Georgia, serif; }}
+                    .header p {{ color: #997A38; font-weight: bold; letter-spacing: 3px; font-size: 12px; margin-top: 5px; }}
+                    .info {{ background: #F9F9F9; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #C5A059; }}
+                    table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
+                    th, td {{ border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }}
+                    th {{ background-color: #2C3E50; color: white; }}
+                    .total {{ font-size: 18px; font-weight: bold; color: #2C3E50; margin-top: 20px; text-align: right; }}
+                    .status {{ margin-top: 20px; padding: 10px; background: #E8F8F5; color: #117A65; font-weight: bold; text-align: center; border-radius: 5px; }}
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h2>Samile Schmitt</h2>
+                    <p>A D V O C A C I A</p>
+                    <p style="color: #666; font-weight: normal; font-size: 11px; margin-top: 5px;">Parecer Técnico de Viabilidade — Isenção de IR (Lei 7.713/88)</p>
+                </div>
+                <div class="info">
+                    <p><b>Data da Análise:</b> {st.session_state['data_analise']}</p>
+                    <p><b>Cliente / Segurado:</b> {st.session_state['nome_editado']}</p>
+                    <p><b>Patologia / CID:</b> {st.session_state['patologia_editada']}</p>
+                    <p><b>Início da Enfermidade:</b> {st.session_state['data_editada']}</p>
+                </div>
+                <h3>Demonstrativo de Valores a Recuperar</h3>
+                {st.session_state['df_final'].to_html(index=False, classes='table')}
+                <div class="total">
+                    Valor Total Estimado: R$ {st.session_state['soma_total_geral']:,.2f}
+                </div>
+                <div class="status">
+                    STATUS: VIÁVEL PARA AJUIZAMENTO — Há direito creditício recuperável a favor do segurado.
+                </div>
+            </body>
+            </html>
+            """
+            
             st.download_button(
-                label="📥 Baixar Laudo Estruturado (TXT/Relatório)",
-                data=relatorio_texto,
-                file_name=f"Parecer_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.txt",
-                mime="text/plain",
+                label="📥 Baixar Laudo Completo em HTML/PDF (Pronto para Impressão)",
+                data=html_relatorio,
+                file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html",
+                mime="text/html",
                 type="primary"
             )
 else:
     st.markdown("""
         <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 20px;">
             <h3 style="color: #2C3E50;">Bem-vindo ao Sistema de Isenção</h3>
-            <p style="color: #666;">Insira sua chave de API na barra lateral e faça o upload dos documentos digitalizados para iniciar a análise jurídica automatizada.</p>
+            <p style="color: #666;">Faça o upload dos documentos digitalizados na barra lateral para iniciar a análise jurídica automatizada.</p>
         </div>
     """, unsafe_allow_html=True)
