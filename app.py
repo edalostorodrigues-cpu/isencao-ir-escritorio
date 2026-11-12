@@ -160,7 +160,6 @@ if arquivos_pdf and api_key_input:
         st.dataframe(pd.DataFrame(tabela_conf), use_container_width=True)
         
         if st.button("🚀 Executar Motor de Cálculo de Indébito", type="primary", use_container_width=True):
-            # Tetos anuais aproximados de isenção/tributação de referência para fundamentação
             tetos_isencao_anual = {
                 2023: 22847.76,
                 2024: 24511.92,
@@ -233,6 +232,7 @@ if arquivos_pdf and api_key_input:
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 
+            # HTML otimizado com script automático para salvar direto em PDF ao clicar em Imprimir
             html_relatorio = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -250,9 +250,17 @@ if arquivos_pdf and api_key_input:
         th {{ background-color: #2C3E50; color: white; }}
         .total-box {{ font-size: 18px; font-weight: bold; color: #2C3E50; text-align: right; margin-top: 20px; padding: 15px; background: #F4F6F7; border-radius: 6px; }}
         .parecer-box {{ background: #F9F9F9; border-left: 4px solid #C5A059; padding: 20px; margin-top: 30px; border-radius: 6px; font-size: 13px; line-height: 1.6; }}
+        @media print {{
+            .no-print {{ display: none; }}
+            body {{ padding: 0; }}
+        }}
     </style>
 </head>
 <body>
+    <div style="text-align: right; margin-bottom: 20px;" class="no-print">
+        <button onclick="window.print()" style="background: #C5A059; color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: bold; border-radius: 5px; cursor: pointer;">🖨️ Salvar / Imprimir em PDF</button>
+    </div>
+
     <div class="header">
         <h1>Samile Schmitt</h1>
         <p>A D V O C A C I A</p>
@@ -273,17 +281,23 @@ if arquivos_pdf and api_key_input:
         Montante Total de Restituição Apurado: R$ {st.session_state['soma_total_geral']:,.2f}
     </div>
     
+    <div class="spec-box" style="margin-top: 20px; padding: 15px; background: #FFF; border: 1px solid #EAE6DF; border-radius: 6px;">
+        <h4 style="margin-top:0; color:#2C3E50;">Memória Analítica e Teto Anual de Isenção</h4>
+        <ul>
+            {"".join([f"<li><b>Exercício {item['ano']}</b>: Rendimento de R$ {item['rend']:,.2f} (Teto Legal de Referência: R$ {item['teto']:,.2f}) — IR Retido Indevido: <b>R$ {item['restituicao']:,.2f}</b></li>" for item in st.session_state['memoria']])}
+        </ul>
+    </div>
+
     <div class="parecer-box">
-        <h3 style="margin-top:0; color:#2C3E50;">Fundamentação Técnica e Memória de Cálculo</h3>
+        <h3 style="margin-top:0; color:#2C3E50;">Fundamentação Técnica e Conclusão</h3>
         <p>A presente auditoria fiscal fundamenta-se estritamente no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que assegura a isenção tributária integral sobre proventos percebidos por portadores de moléstia grave a partir da comprovação médica da enfermidade ({st.session_state['data_editada']}).</p>
-        <p><b>Parâmetros de Auditoria e Teto Legal:</b> O cálculo considerou os limites de isenção e os rendimentos tributáveis declarados em cada exercício fiscal, apurando como indébito tributário o montante correspondente ao Imposto de Renda Retido na Fonte (IRRF) indevidamente recolhido aos cofres públicos.</p>
         <p><b>Conclusão Estratégica:</b> O caso apresenta viabilidade jurídica plena, totalizando créditos passíveis de repetição de indébito de <b>R$ {st.session_state['soma_total_geral']:,.2f}</b>.</p>
     </div>
 </body>
 </html>"""
 
             st.download_button(
-                label="📥 Baixar Laudo Completo (Pronto para Salvar em PDF)",
+                label="📥 Baixar Laudo Oficial (Formato Pronto para PDF)",
                 data=html_relatorio,
                 file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html",
                 mime="text/html",
