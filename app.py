@@ -225,7 +225,6 @@ if arquivos_pdf and api_key_input:
             st.dataframe(st.session_state['df_final'], use_container_width=True)
             st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {st.session_state['soma_total_geral']:,.2f}")
             
-            # Exibição da Memória de Cálculo Didática na Tela
             st.markdown("### 🔍 Memória de Cálculo Detalhada (Como chegamos neste valor)")
             for item in st.session_state['memoria']:
                 st.markdown(f"""
@@ -256,7 +255,7 @@ if arquivos_pdf and api_key_input:
             story.append(Paragraph("A D V O C A C I A", style_subtitle))
             story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#C5A059'), spaceAfter=15))
             
-            story.append(Paragraph(<b>Parecer Técnico de Viabilidade — Isenção de IR (Lei 7.713/88)</b>, style_heading2))
+            story.append(Paragraph("Parecer Tecnico de Viabilidade - Isencao de IR (Lei 7.713/88)", style_heading2))
             story.append(Paragraph(f"<b>Data da Análise:</b> {st.session_state['data_analise']}", style_body))
             story.append(Paragraph(f"<b>Cliente / Segurado:</b> {st.session_state['nome_editado']}", style_body))
             story.append(Paragraph(f"<b>Patologia / CID:</b> {st.session_state['patologia_editada']}", style_body))
@@ -265,8 +264,7 @@ if arquivos_pdf and api_key_input:
             
             story.append(Paragraph("<b>Demonstrativo Consolidado de Valores a Recuperar</b>", style_heading2))
             
-            # Tabela no PDF
-            tabela_dados = [["Ano", "Diferença Anual (R$)", "IR do 13º (R$)", "Total Estimado (R$)"]]
+            tabela_dados = [["Ano", "Diferenca Anual (R$)", "IR do 13 (R$)", "Total Estimado (R$)"]]
             for row in st.session_state['df_final'].values.tolist():
                 tabela_dados.append([str(row[0]), f"R$ {row[1]:,.2f}", f"R$ {row[2]:,.2f}", f"R$ {row[3]:,.2f}"])
                 
@@ -284,7 +282,7 @@ if arquivos_pdf and api_key_input:
             story.append(t)
             story.append(Spacer(1, 10))
             
-            story.append(Paragraph(<b>Memória de Cálculo e Fundamentação Técnica</b>, style_heading2))
+            story.append(Paragraph("<b>Memória de Cálculo e Fundamentação Técnica</b>", style_heading2))
             story.append(Paragraph("A presente análise fundamenta-se no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que garante isenção de Imposto de Renda sobre proventos de aposentadoria ou pensão para portadores de moléstia grave.", style_body))
             
             for item in st.session_state['memoria']:
@@ -293,7 +291,7 @@ if arquivos_pdf and api_key_input:
                 
             story.append(Spacer(1, 10))
             story.append(Paragraph(f"<b>VALOR TOTAL ESTIMADO DA RESTITUIÇÃO: R$ {st.session_state['soma_total_geral']:,.2f}</b>", style_heading2))
-            story.append(Paragraph("<b>STATUS JURÍDICO:</b> VIÁVEL PARA AJUIZAMENTO — Há direito creditício recuperável a favor do segurado.", style_body))
+            story.append(Paragraph("<b>STATUS JURÍDICO:</b> VIÁVEL PARA AJUIZAMENTO - Há direito creditício recuperável a favor do segurado.", style_body))
             
             doc.build(story)
             pdf_data = buffer.getvalue()
