@@ -46,7 +46,7 @@ st.markdown("""
         <h2 style="color: #2C3E50; font-family: 'Georgia', serif; margin-bottom: 0;">Samile Schmitt</h2>
         <p style="letter-spacing: 5px; color: #997A38; font-size: 13px; font-weight: bold; margin-top: 5px;">A D V O C A C I A</p>
         <hr style="width: 140px; border: 1px solid #C5A059; margin: 15px auto;">
-        <h4 style="color: #555; font-weight: normal; font-size: 15px; margin-top: 5px;">Módulo de Auditoria e Isenção de IR (Lei 7.713/88)</h4>
+        <h4 style="color: #555; font-weight: normal; font-size: 15px; margin-top: 5px;">Módulo de Auditoria e Cálculo de Isenção de IR (Lei 7.713/88)</h4>
     </div>
 """, unsafe_allow_html=True)
 
@@ -77,13 +77,14 @@ def extrair_texto_pdfs(files):
             st.warning(f"⚠️ Aviso: Falha ao ler o arquivo '{file.name}'.")
     return texto_total
 
+# Extração estrita dos valores oficiais declarados
 def extrair_dados_fiscais(texto_documentos, api_key):
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-3.8-flash')
     
     prompt = f"""
-    Você é um assistente de extração de dados contábeis de IRPF. Localize os valores exatos de "Rendimentos Tributáveis Recebidos de PJ ou PF" e o "Imposto de Renda Retido na Fonte (IRRF)" declarados nos anos de 2023, 2024 e 2025.
-    Retorne estritamente UM JSON PURO (sem formatação markdown de código, apenas o json) com os valores convertidos em CENTAVOS (inteiros). Se não houver dados para o ano, preencha com 0:
+    Você é um auditor fiscal especialista em imposto de renda. Extraia estritamente os valores nominais exatos de "Rendimentos Tributáveis Recebidos de PJ ou PF" e o "Imposto de Renda Retido na Fonte (IRRF)" declarados nos anos de 2023, 2024 e 2025.
+    Retorne estritamente UM JSON PURO (sem formatação markdown, apenas o json) com os valores convertidos em CENTAVOS (inteiros). Se não houver dados para o ano, preencha com 0:
     {{
       "nome_cliente": "Nome completo do contribuinte",
       "anos": {{
@@ -145,7 +146,7 @@ if arquivos_pdf and api_key_input:
             else:
                 patologia_editada = cid_selecionado
         with col3:
-            data_editada = st.text_input("Data de Início da Doença (DD/MM/AAAA)", "15/01/2023", help="Digite no formato DD/MM/AAAA")
+            data_editada = st.text_input("Data de Início da Doença (DD/MM/AAAA)", "11/05/2023", help="Digite no formato DD/MM/AAAA")
             
         st.markdown("---")
         st.markdown("#### 📊 Conferência de Valores Extraídos dos PDFs")
@@ -159,13 +160,7 @@ if arquivos_pdf and api_key_input:
             })
         st.dataframe(pd.DataFrame(tabela_conf), use_container_width=True)
         
-        if st.button("🚀 Executar Motor de Cálculo de Indébito", type="primary", use_container_width=True):
-            tabelas_oficiais = {
-                2023: {"limite_isencao_mensal": 190398, "aliquota": 0.15},
-                2024: {"limite_isencao_mensal": 211200, "aliquota": 0.15},
-                2025: {"limite_isencao_mensal": 225920, "aliquota": 0.15}
-            }
-            
+        if st.button("🚀 Executar Motor de Cálculo de Indébito (Repetição de Indébito)", type="primary", use_container_width=True):
             resultado_linhas = []
             memoria_calculo_detalhada = []
             soma_total_geral = 0
@@ -175,12 +170,11 @@ if arquivos_pdf and api_key_input:
                 rend = info['rend_tributavel_original']
                 ir_retido = info['ir_retido_original']
                 
-                tabela = tabelas_oficiais.get(ano, tabelas_oficiais[2024])
-                limite_anual = tabela["limite_isencao_mensal"] * 12
-                
-                base_isenta = min(rend, limite_anual)
-                restituicao_anual = int(base_isenta * tabela["aliquota"])
-                restituicao_anual = min(restituicao_anual, ir_retido)
+                # Conceito Jurídico Aplicado: 
+                # Sendo os rendimentos previdenciários isentos por moléstia grave a partir da data do laudo,
+                # o indébito tributário corresponde integralmente ao Imposto de Renda Retido na Fonte (IRRF) 
+                # comprovado nos exercícios abrangidos pela exigibilidade.
+                restituicao_anual = ir_retido
                 
                 soma_total_geral += restituicao_anual
                 
@@ -225,8 +219,8 @@ if arquivos_pdf and api_key_input:
                 st.markdown(f"""
                 * **Exercício {item['ano']}**: 
                   * *Rendimento Tributável Declarado*: R$ {item['rend']:,.2f}
-                  * *Imposto Retido na Fonte (IRRF)*: R$ {item['ir_retido']:,.2f}
-                  * *Indébito Apurado (Restituição Lei 7.713/88)*: **R$ {item['restituicao']:,.2f}**
+                  * *Imposto de Renda Retido na Fonte (IRRF)*: R$ {item['ir_retido']:,.2f}
+                  * *Indébito Tributário Apurado (Restituição Integral do IRRF Indevido)*: **R$ {item['restituicao']:,.2f}**
                 """)
 
             if st.session_state['soma_total_geral'] > 0:
@@ -276,8 +270,8 @@ if arquivos_pdf and api_key_input:
     
     <div class="parecer-box">
         <h3 style="margin-top:0; color:#2C3E50;">Fundamentação Técnica e Memória de Cálculo</h3>
-        <p>A presente auditoria fiscal fundamenta-se estritamente no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que assegura a isenção tributária sobre proventos percebidos por portadores de moléstia grave.</p>
-        <p><b>Parâmetros de Auditoria:</b> O cruzamento de dados obedeceu aos tetos legais vigentes em cada exercício, apurando o indébito do imposto retido na fonte, respeitando os limites da prescrição quinquenal.</p>
+        <p>A presente auditoria fiscal fundamenta-se estritamente no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que assegura a isenção tributária sobre proventos percebidos por portadores de moléstia grave a partir da comprovação médica da enfermidade.</p>
+        <p><b>Parâmetros de Auditoria:</b> O indébito tributário apurado corresponde exatamente ao Imposto de Renda Retido na Fonte (IRRF) incidente sobre os proventos nos exercícios amparados pelo direito creditício, respeitando os limites legais e prescricionais.</p>
         <p><b>Conclusão Estratégica:</b> O caso apresenta viabilidade jurídica plena, totalizando créditos passíveis de repetição de indébito de <b>R$ {st.session_state['soma_total_geral']:,.2f}</b>.</p>
     </div>
 </body>
