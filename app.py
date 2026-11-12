@@ -40,7 +40,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Cabeçalho Principal Limpo e Elegante (Apenas Nome e Advocacia)
+# Cabeçalho Principal Limpo e Elegante
 st.markdown("""
     <div style="text-align: center; padding: 10px 0 20px 0;">
         <h2 style="color: #2C3E50; font-family: 'Georgia', serif; margin-bottom: 0;">Samile Schmitt</h2>
@@ -124,15 +124,17 @@ if arquivos_pdf and api_key_input:
     if 'dados_cliente' in st.session_state and st.session_state['dados_cliente']:
         dados_cliente = st.session_state['dados_cliente']
         
-        st.markdown("### 📋 Doutrina e Dados Cadastrais do Cliente")
+        st.markdown("### 📋 Dados Cadastrais e Laudo Médico")
         
         col1, col2, col3 = st.columns(3)
         with col1:
             nome_editado = st.text_input("Segurado / Cliente", dados_cliente.get("nome_cliente", ""))
         with col2:
-            patologia_editada = st.text_input("Patologia / CID (Ajuste Manual)", dados_cliente.get("patologia_cid", "C20 (Neoplasia Maligna)"))
+            # Preenchimento automático (se a IA achar) ou ajuste manual direto na caixa
+            patologia_editada = st.text_input("Patologia / CID (Automático ou Manual)", dados_cliente.get("patologia_cid", ""))
         with col3:
-            data_editada = st.text_input("Data de Início da Doença (Ajuste Manual)", "2023-01-15")
+            # Preenchimento automático ou ajuste manual direto na caixa
+            data_editada = st.text_input("Data de Início da Doença (Automático ou Manual)", dados_cliente.get("data_inicio_doenca", ""))
             
         st.markdown("---")
         st.markdown("#### 📊 Demonstrativo de Valores Originais Extraídos")
