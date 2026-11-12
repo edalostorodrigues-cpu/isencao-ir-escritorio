@@ -4,7 +4,7 @@ import pypdf
 import google.generativeai as genai
 import json
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 # Configuração da Página
 st.set_page_config(
@@ -203,7 +203,10 @@ if arquivos_pdf and api_key_input:
             st.session_state['nome_editado'] = nome_editado
             st.session_state['patologia_editada'] = patologia_editada
             st.session_state['data_editada'] = data_editada
-            st.session_state['data_analise'] = datetime.now().strftime("%d/%m/%Y às %H:%M")
+            
+            # Ajuste correto para o fuso horário de Brasília (UTC-3)
+            fuso_br = timezone(timedelta(hours=-3))
+            st.session_state['data_analise'] = datetime.now(fuso_br).strftime("%d/%m/%Y às %H:%M")
 
         if 'df_final' in st.session_state:
             st.success("Cálculo executado com sucesso!")
@@ -232,7 +235,7 @@ if arquivos_pdf and api_key_input:
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 
-            # Conteúdo HTML profissional formatado para o laudo
+            # Conteúdo HTML profissional para o PDF
             html_relatorio = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -288,7 +291,7 @@ if arquivos_pdf and api_key_input:
 </body>
 </html>"""
 
-            # Codificação inteligente para forçar o download direto de um arquivo .pdf real
+            # Codificação em base64 para download direto do PDF
             b64 = base64.b64encode(html_relatorio.encode()).decode()
             nome_arquivo = f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.pdf"
             
