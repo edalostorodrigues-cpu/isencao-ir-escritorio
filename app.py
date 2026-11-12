@@ -11,27 +11,24 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilização CSS Avançada: Logotipo Oficial como Marca d'Água (Watermark) no Fundo e Estética Corporativa
-st.markdown(f"""
+# Estilização CSS Avançada (Corrigido para evitar conflito de chaves)
+st.markdown("""
     <style>
-    .main {{
+    .main {
         background-color: #FDFCFB;
-        /* Logotipo oficial do escritório incorporado elegantemente no fundo */
-        background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
         background-repeat: no-repeat;
         background-position: center 55%;
         background-size: 400px auto;
         background-attachment: fixed;
     }
-    /* Caixa de conteúdo principal com leve translucidez para destacar os dados */
-    .block-container {{
+    .block-container {
         background-color: rgba(255, 255, 255, 0.94);
         padding: 2.5rem;
         border-radius: 12px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.04);
         border: 1px solid #EAE6DF;
     }
-    .stButton>button {{
+    .stButton>button {
         background: linear-gradient(135deg, #C5A059 0%, #997A38 100%);
         color: white;
         font-weight: bold;
@@ -39,8 +36,8 @@ st.markdown(f"""
         border-radius: 6px;
         padding: 0.5rem 1rem;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }}
-    .stButton>button:hover {{
+    }
+    .stButton>button:hover {
         background: linear-gradient(135deg, #D4AF37 0%, #B38F42 100%);
         color: white;
     }
@@ -206,4 +203,16 @@ if arquivos_pdf and api_key_input:
             """, unsafe_allow_html=True)
             
             st.dataframe(df_final, use_container_width=True)
-            st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS",
+            st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {soma_total_geral/100:,.2f}")
+            
+            if soma_total_geral > 0:
+                st.markdown("🟢 **STATUS:** `VIÁVEL PARA AJUIZAMENTO` — Há direito creditício recuperável a favor do segurado.")
+            else:
+                st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
+else:
+    st.markdown("""
+        <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 30px;">
+            <h3 style="color: #2C3E50;">Bem-vindo ao Sistema de Isenção</h3>
+            <p style="color: #666;">Insira sua chave de API na barra lateral e faça o upload dos documentos digitalizados para iniciar a análise jurídica automatizada.</p>
+        </div>
+    """, unsafe_allow_html=True)
