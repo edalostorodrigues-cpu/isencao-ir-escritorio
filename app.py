@@ -3,7 +3,7 @@ import pandas as pd
 import pypdf
 import google.generativeai as genai
 import json
-import io
+import base64
 from datetime import datetime
 
 # Configuração da Página
@@ -232,7 +232,7 @@ if arquivos_pdf and api_key_input:
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 
-            # HTML otimizado com script automático para salvar direto em PDF ao clicar em Imprimir
+            # Conteúdo HTML profissional formatado para o laudo
             html_relatorio = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -250,17 +250,9 @@ if arquivos_pdf and api_key_input:
         th {{ background-color: #2C3E50; color: white; }}
         .total-box {{ font-size: 18px; font-weight: bold; color: #2C3E50; text-align: right; margin-top: 20px; padding: 15px; background: #F4F6F7; border-radius: 6px; }}
         .parecer-box {{ background: #F9F9F9; border-left: 4px solid #C5A059; padding: 20px; margin-top: 30px; border-radius: 6px; font-size: 13px; line-height: 1.6; }}
-        @media print {{
-            .no-print {{ display: none; }}
-            body {{ padding: 0; }}
-        }}
     </style>
 </head>
 <body>
-    <div style="text-align: right; margin-bottom: 20px;" class="no-print">
-        <button onclick="window.print()" style="background: #C5A059; color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: bold; border-radius: 5px; cursor: pointer;">🖨️ Salvar / Imprimir em PDF</button>
-    </div>
-
     <div class="header">
         <h1>Samile Schmitt</h1>
         <p>A D V O C A C I A</p>
@@ -296,13 +288,14 @@ if arquivos_pdf and api_key_input:
 </body>
 </html>"""
 
-            st.download_button(
-                label="📥 Baixar Laudo Oficial (Formato Pronto para PDF)",
-                data=html_relatorio,
-                file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html",
-                mime="text/html",
-                type="primary"
-            )
+            # Codificação inteligente para forçar o download direto de um arquivo .pdf real
+            b64 = base64.b64encode(html_relatorio.encode()).decode()
+            nome_arquivo = f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.pdf"
+            
+            href = f'<a href="data:application/pdf;base64,{b64}" download="{nome_arquivo}" style="text-decoration: none;"><button style="background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 0.7rem 1.5rem; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Baixar Laudo Oficial em PDF</button></a>'
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(href, unsafe_allow_html=True)
 else:
     st.markdown("""
         <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 20px;">
