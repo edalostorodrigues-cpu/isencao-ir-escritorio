@@ -21,7 +21,7 @@ with st.sidebar:
         accept_multiple_files=True
     )
     
-    # Chave da API do Gemini (Pode ser configurada nos Secrets do Streamlit ou inserida aqui)
+    # Chave da API do Gemini
     api_key_input = st.text_input("Chave da API Gemini (Google AI Studio)", type="password", help="Insira sua chave para ativar a extração automática por IA.")
 
 # Função para extrair texto dos PDFs enviados
@@ -36,8 +36,8 @@ def extrair_texto_pdfs(files):
 # Função que usa o Gemini para extrair os dados estruturados dos documentos
 def analisar_documentos_com_ia(texto_documentos, api_key):
     genai.configure(api_key=api_key)
-    # Usando o modelo flash rápido para extração estruturada
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    # Usando o modelo atualizado gemini-3.8-flash
+    model = genai.GenerativeModel('gemini-3.8-flash')
     
     prompt = f"""
     Você é um assistente jurídico especializado em direito tributário e previdenciário (Lei 7.713/88).
@@ -61,7 +61,6 @@ def analisar_documentos_com_ia(texto_documentos, api_key):
     
     try:
         response = model.generate_content(prompt)
-        # Limpa o texto para garantir que seja um JSON válido
         texto_resposta = response.text.replace("```json", "").replace("```", "").strip()
         return json.loads(texto_resposta)
     except Exception as e:
@@ -86,7 +85,6 @@ if arquivos_pdf and api_key_input:
         with col3:
             st.metric("Início da Doença", dados_cliente.get("data_inicio_doenca", ""))
             
-        # Tabela de conferência rápida
         tabela_conf = []
         for ano, info in dados_cliente['anos'].items():
             tabela_conf.append({
