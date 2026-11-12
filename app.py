@@ -82,7 +82,8 @@ def extrair_texto_pdfs(files):
 # Função que usa o Gemini para extrair os dados estruturados dos documentos
 def analisar_documentos_com_ia(texto_documentos, api_key):
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # Modelo atualizado e altamente estável
+    model = genai.GenerativeModel('gemini-2.5-flash')
     
     prompt = f"""
     Você é um assistente jurídico sênior especializado em direito tributário e previdenciário (Lei 7.713/88).
@@ -228,50 +229,58 @@ if arquivos_pdf and api_key_input:
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 
-            # Geração de Relatório em formato HTML elegante para Impressão/PDF direto pelo navegador
-            html_relatorio = f"""<html>
+            # Geração de Relatório PDF Formatado e Estilizado
+            pdf_html = f"""<!DOCTYPE html>
+<html>
 <head>
+    <meta charset="utf-8">
     <style>
-        body {{ font-family: 'Helvetica', Arial, sans-serif; color: #333; padding: 30px; }}
-        .header {{ text-align: center; border-bottom: 2px solid #C5A059; padding-bottom: 15px; margin-bottom: 20px; }}
-        .header h2 {{ color: #2C3E50; margin: 0; font-family: Georgia, serif; }}
-        .header p {{ color: #997A38; font-weight: bold; letter-spacing: 3px; font-size: 12px; margin-top: 5px; }}
-        .info {{ background: #F9F9F9; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #C5A059; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
-        th, td {{ border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }}
+        body {{ font-family: 'Helvetica', Arial, sans-serif; color: #2C3E50; padding: 40px; }}
+        .header {{ text-align: center; border-bottom: 2px solid #C5A059; padding-bottom: 20px; margin-bottom: 30px; }}
+        .header h1 {{ margin: 0; font-family: 'Georgia', serif; color: #2C3E50; font-size: 26px; }}
+        .header p {{ color: #997A38; font-weight: bold; letter-spacing: 4px; font-size: 13px; margin-top: 5px; }}
+        .sub {{ color: #555; font-size: 12px; margin-top: 5px; }}
+        .info-box {{ background: #FDFCFB; padding: 20px; border-radius: 8px; border: 1px solid #EAE6DF; border-left: 5px solid #C5A059; margin-bottom: 30px; }}
+        .info-box p {{ margin: 8px 0; font-size: 14px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; }}
+        th, td {{ border: 1px solid #EAE6DF; padding: 12px; text-align: left; font-size: 13px; }}
         th {{ background-color: #2C3E50; color: white; }}
-        .total {{ font-size: 18px; font-weight: bold; color: #2C3E50; margin-top: 20px; text-align: right; }}
-        .status {{ margin-top: 20px; padding: 10px; background: #E8F8F5; color: #117A65; font-weight: bold; text-align: center; border-radius: 5px; }}
+        .total-box {{ font-size: 18px; font-weight: bold; color: #2C3E50; text-align: right; margin-top: 20px; padding: 15px; background: #F4F6F7; border-radius: 6px; }}
+        .status-box {{ margin-top: 20px; padding: 15px; background: #E8F8F5; color: #117A65; font-weight: bold; text-align: center; border-radius: 6px; font-size: 14px; }}
     </style>
 </head>
 <body>
     <div class="header">
-        <h2>Samile Schmitt</h2>
+        <h1>Samile Schmitt</h1>
         <p>A D V O C A C I A</p>
-        <p style="color: #666; font-weight: normal; font-size: 11px; margin-top: 5px;">Parecer Técnico de Viabilidade — Isenção de IR (Lei 7.713/88)</p>
+        <div class="sub">Parecer Técnico de Viabilidade — Isenção de IR (Lei 7.713/88)</div>
     </div>
-    <div class="info">
+    
+    <div class="info-box">
         <p><b>Data da Análise:</b> {st.session_state['data_analise']}</p>
         <p><b>Cliente / Segurado:</b> {st.session_state['nome_editado']}</p>
         <p><b>Patologia / CID:</b> {st.session_state['patologia_editada']}</p>
         <p><b>Início da Enfermidade:</b> {st.session_state['data_editada']}</p>
     </div>
-    <h3>Demonstrativo de Valores a Recuperar</h3>
+
+    <h3 style="color: #2C3E50; border-bottom: 1px solid #ddd; padding-bottom: 8px;">Demonstrativo de Valores a Recuperar</h3>
     {st.session_state['df_final'].to_html(index=False, classes='table')}
-    <div class="total">
-        Valor Total Estimado: R$ {st.session_state['soma_total_geral']:,.2f}
+    
+    <div class="total-box">
+        Valor Total Estimado da Restituição: R$ {st.session_state['soma_total_geral']:,.2f}
     </div>
-    <div class="status">
+    
+    <div class="status-box">
         STATUS: VIÁVEL PARA AJUIZAMENTO — Há direito creditício recuperável a favor do segurado.
     </div>
 </body>
 </html>"""
-            
+
             st.download_button(
-                label="📥 Baixar Laudo Completo em HTML/PDF (Pronto para Impressão)",
-                data=html_relatorio,
-                file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html",
-                mime="text/html",
+                label="📥 Baixar Laudo Oficial em PDF",
+                data=pdf_html,
+                file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.pdf",
+                mime="application/pdf",
                 type="primary"
             )
 else:
