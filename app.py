@@ -12,7 +12,7 @@ st.subheader("Análise Automatizada de Isenção de IR com Leitura de PDFs por I
 
 with st.sidebar:
     st.header("📂 Importação de Documentos")
-    st.info("Envie os PDFs (Laudo Médico, IRPF e HISCRE do INSS). A IA extrairá os dados automaticamente.")
+    st.info("Envie os PDFs (Laudo Médico, IRPF e HISCRE do INSS).")
     
     # Upload dos PDFs
     arquivos_pdf = st.file_uploader(
@@ -36,7 +36,6 @@ def extrair_texto_pdfs(files):
 # Função que usa o Gemini para extrair os dados estruturados dos documentos
 def analisar_documentos_com_ia(texto_documentos, api_key):
     genai.configure(api_key=api_key)
-    # Usando o modelo atualizado gemini-3.8-flash
     model = genai.GenerativeModel('gemini-3.8-flash')
     
     prompt = f"""
@@ -69,13 +68,21 @@ def analisar_documentos_com_ia(texto_documentos, api_key):
 
 # Área Principal
 if arquivos_pdf and api_key_input:
-    st.success(f"{len(arquivos_pdf)} documento(s) carregado(s). Processando leitura automática...")
+    st.success(f"{len(arquivos_pdf)} documento(s) carregado(s) com sucesso!")
     
-    with st.spinner("A Inteligência Artificial está lendo os documentos e extraindo os dados..."):
-        texto_extraido = extrair_texto_pdfs(arquivos_pdf)
-        dados_cliente = analisar_documentos_com_ia(texto_extraido, api_key_input)
+    # Botão para disparar a leitura controlada
+    if st.button("🤖 Iniciar Leitura Automática com IA", type="primary"):
+        with st.spinner("A Inteligência Artificial está lendo os documentos... Aguarde um instante."):
+            texto_extraido = extrair_texto_pdfs(arquivos_pdf)
+            dados_cliente = analisar_documentos_com_ia(texto_extraido, api_key_input)
+            
+            # Guarda os dados na sessão do Streamlit
+            st.session_state['dados_cliente'] = dados_cliente
+
+    # Se já tiver os dados processados na sessão, exibe a tela de conferência e cálculo
+    if 'dados_cliente' in st.session_state and st.session_state['dados_cliente']:
+        dados_cliente = st.session_state['dados_cliente']
         
-    if dados_cliente:
         st.markdown("### 📋 Dados Identificados Automaticamente pela IA")
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -147,7 +154,5 @@ if arquivos_pdf and api_key_input:
                 st.markdown("🟢 **STATUS:** `VIÁVEL PARA AJUIZAMENTO` — Há direito creditício recuperável.")
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
-    else:
-        st.warning("A IA não conseguiu estruturar os dados do PDF. Verifique se os arquivos contêm texto legível.")
 else:
-    st.info("👈 Insira sua Chave da API do Gemini na barra lateral e faça o upload dos PDFs do cliente para preenchimento automático.")
+    st.info("👈 Insira sua Chave da API do Gemini na barra lateral e faça o upload dos PDFs do cliente para iniciar.")
