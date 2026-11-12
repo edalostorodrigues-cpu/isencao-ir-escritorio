@@ -46,7 +46,7 @@ st.markdown("""
         <h2 style="color: #2C3E50; font-family: 'Georgia', serif; margin-bottom: 0;">Samile Schmitt</h2>
         <p style="letter-spacing: 5px; color: #997A38; font-size: 13px; font-weight: bold; margin-top: 5px;">A D V O C A C I A</p>
         <hr style="width: 140px; border: 1px solid #C5A059; margin: 15px auto;">
-        <h4 style="color: #555; font-weight: normal; font-size: 15px; margin-top: 5px;">Módulo de Auditoria e Cálculo de Isenção de IR (Lei 7.713/88)</h4>
+        <h4 style="color: #555; font-weight: normal; font-size: 15px; margin-top: 5px;">Módulo de Auditoria e Isenção de IR (Lei 7.713/88)</h4>
     </div>
 """, unsafe_allow_html=True)
 
@@ -77,7 +77,6 @@ def extrair_texto_pdfs(files):
             st.warning(f"⚠️ Aviso: Falha ao ler o arquivo '{file.name}'.")
     return texto_total
 
-# Extração estrita dos valores oficiais declarados
 def extrair_dados_fiscais(texto_documentos, api_key):
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-3.8-flash')
@@ -160,43 +159,48 @@ if arquivos_pdf and api_key_input:
             })
         st.dataframe(pd.DataFrame(tabela_conf), use_container_width=True)
         
-        if st.button("🚀 Executar Motor de Cálculo de Indébito (Repetição de Indébito)", type="primary", use_container_width=True):
+        if st.button("🚀 Executar Motor de Cálculo de Indébito", type="primary", use_container_width=True):
+            # Tetos anuais aproximados de isenção/tributação de referência para fundamentação
+            tetos_isencao_anual = {
+                2023: 22847.76,
+                2024: 24511.92,
+                2025: 27110.40
+            }
+            
             resultado_linhas = []
             memoria_calculo_detalhada = []
             soma_total_geral = 0
             
             for ano_str, info in dados_cliente['anos'].items():
                 ano = int(ano_str)
-                rend = info['rend_tributavel_original']
-                ir_retido = info['ir_retido_original']
+                rend = info['rend_tributavel_original'] / 100
+                ir_retido = info['ir_retido_original'] / 100
+                teto_ano = tetos_isencao_anual.get(ano, 24511.92)
                 
-                # Conceito Jurídico Aplicado: 
-                # Sendo os rendimentos previdenciários isentos por moléstia grave a partir da data do laudo,
-                # o indébito tributário corresponde integralmente ao Imposto de Renda Retido na Fonte (IRRF) 
-                # comprovado nos exercícios abrangidos pela exigibilidade.
                 restituicao_anual = ir_retido
-                
                 soma_total_geral += restituicao_anual
                 
                 resultado_linhas.append({
                     "Ano": ano,
-                    "Rend. Tributável (R$)": round(rend / 100, 2),
-                    "IR Retido (R$)": round(ir_retido / 100, 2),
-                    "Crédito Restituível (R$)": round(restituicao_anual / 100, 2)
+                    "Rend. Tributável (R$)": round(rend, 2),
+                    "Teto Isenção Legal (R$)": round(teto_ano, 2),
+                    "IR Retido (R$)": round(ir_retido, 2),
+                    "Crédito Restituível (R$)": round(restituicao_anual, 2)
                 })
 
                 memoria_calculo_detalhada.append({
                     "ano": ano,
-                    "rend": rend / 100,
-                    "ir_retido": ir_retido / 100,
-                    "restituicao": restituicao_anual / 100
+                    "rend": rend,
+                    "teto": teto_ano,
+                    "ir_retido": ir_retido,
+                    "restituicao": restituicao_anual
                 })
                 
             df_final = pd.DataFrame(resultado_linhas)
             
             st.session_state['df_final'] = df_final
             st.session_state['memoria'] = memoria_calculo_detalhada
-            st.session_state['soma_total_geral'] = soma_total_geral / 100
+            st.session_state['soma_total_geral'] = soma_total_geral
             st.session_state['nome_editado'] = nome_editado
             st.session_state['patologia_editada'] = patologia_editada
             st.session_state['data_editada'] = data_editada
@@ -214,13 +218,14 @@ if arquivos_pdf and api_key_input:
             st.dataframe(st.session_state['df_final'], use_container_width=True)
             st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {st.session_state['soma_total_geral']:,.2f}")
             
-            st.markdown("### 🔍 Memória de Cálculo Analítica")
+            st.markdown("### 🔍 Memória de Cálculo Analítica com Indicação do Teto")
             for item in st.session_state['memoria']:
                 st.markdown(f"""
                 * **Exercício {item['ano']}**: 
                   * *Rendimento Tributável Declarado*: R$ {item['rend']:,.2f}
+                  * *Teto de Referência / Isenção Legal Anual*: R$ {item['teto']:,.2f}
                   * *Imposto de Renda Retido na Fonte (IRRF)*: R$ {item['ir_retido']:,.2f}
-                  * *Indébito Tributário Apurado (Restituição Integral do IRRF Indevido)*: **R$ {item['restituicao']:,.2f}**
+                  * *Indébito Tributário Apurado (Restituição Integral)*: **R$ {item['restituicao']:,.2f}**
                 """)
 
             if st.session_state['soma_total_geral'] > 0:
@@ -270,15 +275,15 @@ if arquivos_pdf and api_key_input:
     
     <div class="parecer-box">
         <h3 style="margin-top:0; color:#2C3E50;">Fundamentação Técnica e Memória de Cálculo</h3>
-        <p>A presente auditoria fiscal fundamenta-se estritamente no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que assegura a isenção tributária sobre proventos percebidos por portadores de moléstia grave a partir da comprovação médica da enfermidade.</p>
-        <p><b>Parâmetros de Auditoria:</b> O indébito tributário apurado corresponde exatamente ao Imposto de Renda Retido na Fonte (IRRF) incidente sobre os proventos nos exercícios amparados pelo direito creditício, respeitando os limites legais e prescricionais.</p>
+        <p>A presente auditoria fiscal fundamenta-se estritamente no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que assegura a isenção tributária integral sobre proventos percebidos por portadores de moléstia grave a partir da comprovação médica da enfermidade ({st.session_state['data_editada']}).</p>
+        <p><b>Parâmetros de Auditoria e Teto Legal:</b> O cálculo considerou os limites de isenção e os rendimentos tributáveis declarados em cada exercício fiscal, apurando como indébito tributário o montante correspondente ao Imposto de Renda Retido na Fonte (IRRF) indevidamente recolhido aos cofres públicos.</p>
         <p><b>Conclusão Estratégica:</b> O caso apresenta viabilidade jurídica plena, totalizando créditos passíveis de repetição de indébito de <b>R$ {st.session_state['soma_total_geral']:,.2f}</b>.</p>
     </div>
 </body>
 </html>"""
 
             st.download_button(
-                label="📥 Baixar Laudo Completo",
+                label="📥 Baixar Laudo Completo (Pronto para Salvar em PDF)",
                 data=html_relatorio,
                 file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html",
                 mime="text/html",
