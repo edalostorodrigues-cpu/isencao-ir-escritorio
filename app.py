@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilização CSS personalizada para dar o toque corporativo e elegante (Tons de Dourado e Cinza Escuro)
+# Estilização CSS personalizada (Tons de Dourado, Cinza Escuro e Estética Corporativa)
 st.markdown("""
     <style>
     .main {
@@ -30,19 +30,17 @@ st.markdown("""
         background: linear-gradient(135deg, #D4AF37 0%, #B38F42 100%);
         color: white;
     }
-    .css-1544g2n {
-        padding-top: 2rem;
-    }
     </style>
 """, unsafe_allow_html=True)
 
-# Cabeçalho Elegante do Escritório
+# Cabeçalho com o Logotipo Estilizado do Escritório (O "S" com as Balanças e Tipografia)
 st.markdown("""
     <div style="text-align: center; padding: 10px 0 20px 0;">
-        <h2 style="color: #2C3E50; font-family: 'Georgia', serif; margin-bottom: 0;">Samile Schmitt</h2>
-        <p style="letter-spacing: 3px; color: #997A38; font-size: 14px; font-weight: bold; margin-top: 5px;">A D V O C A C I A</p>
-        <hr style="width: 100px; border: 1px solid #C5A059; margin: 10px auto;">
-        <h4 style="color: #555; font-weight: normal; margin-top: 5px;">Módulo de Análise Inteligente e Cálculo de Isenção de IR (Doença Grave)</h4>
+        <div style="font-size: 42px; color: #C5A059; margin-bottom: -5px;">⚖️ <b>Ⓢ</b></div>
+        <h2 style="color: #2C3E50; font-family: 'Georgia', serif; margin-top: 5px; margin-bottom: 0;">Samile Schmitt</h2>
+        <p style="letter-spacing: 4px; color: #997A38; font-size: 13px; font-weight: bold; margin-top: 5px;">A D V O C A C I A</p>
+        <hr style="width: 120px; border: 1px solid #C5A059; margin: 15px auto;">
+        <h4 style="color: #555; font-weight: normal; font-size: 16px; margin-top: 5px;">Módulo de Análise Inteligente e Cálculo de Isenção de IR (Doença Grave)</h4>
     </div>
 """, unsafe_allow_html=True)
 
@@ -126,10 +124,8 @@ if arquivos_pdf and api_key_input:
         with col1:
             nome_editado = st.text_input("Segurado / Cliente", dados_cliente.get("nome_cliente", ""))
         with col2:
-            # Opção manual caso o laudo não tenha vindo nos PDFs
             patologia_editada = st.text_input("Patologia / CID (Ajuste Manual)", dados_cliente.get("patologia_cid", "C20 (Neoplasia Maligna)"))
         with col3:
-            # Opção manual para a data de início
             data_editada = st.text_input("Data de Início da Doença (Ajuste Manual)", "2023-01-15")
             
         st.markdown("---")
