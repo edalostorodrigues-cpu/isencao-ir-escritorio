@@ -12,7 +12,7 @@ st.subheader("Análise Automatizada de Isenção de IR com Leitura de PDFs por I
 
 with st.sidebar:
     st.header("📂 Importação de Documentos")
-    st.info("Envie os PDFs (Laudo Médico, IRPF e HISCRE do INSS).")
+    st.info("Envie os PDFs (IRPF e HISCRE do INSS).")
     
     # Upload dos PDFs
     arquivos_pdf = st.file_uploader(
@@ -75,22 +75,23 @@ if arquivos_pdf and api_key_input:
         with st.spinner("A Inteligência Artificial está lendo os documentos... Aguarde um instante."):
             texto_extraido = extrair_texto_pdfs(arquivos_pdf)
             dados_cliente = analisar_documentos_com_ia(texto_extraido, api_key_input)
-            
-            # Guarda os dados na sessão do Streamlit
             st.session_state['dados_cliente'] = dados_cliente
 
-    # Se já tiver os dados processados na sessão, exibe a tela de conferência e cálculo
+    # Se já tiver os dados processados na sessão, exibe a tela
     if 'dados_cliente' in st.session_state and st.session_state['dados_cliente']:
         dados_cliente = st.session_state['dados_cliente']
         
-        st.markdown("### 📋 Dados Identificados Automaticamente pela IA")
+        st.markdown("### 📋 Dados Identificados nos Documentos")
+        
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Segurado", dados_cliente.get("nome_cliente", ""))
+            nome_editado = st.text_input("Segurado", dados_cliente.get("nome_cliente", ""))
         with col2:
-            st.metric("Patologia / CID", dados_cliente.get("patologia_cid", ""))
+            # Opção manual caso o laudo não tenha vindo nos PDFs
+            patologia_editada = st.text_input("Patologia / CID (Ajuste Manual)", dados_cliente.get("patologia_cid", "C20 (Neoplasia Maligna)"))
         with col3:
-            st.metric("Início da Doença", dados_cliente.get("data_inicio_doenca", ""))
+            # Opção manual para a data de início
+            data_editada = st.text_input("Data de Início da Doença (Ajuste Manual)", "2023-01-15")
             
         tabela_conf = []
         for ano, info in dados_cliente['anos'].items():
@@ -147,6 +148,7 @@ if arquivos_pdf and api_key_input:
             df_final = pd.DataFrame(resultado_linhas)
             
             st.success("Análise concluída com sucesso!")
+            st.markdown(f"### 📄 Laudo Técnico para: {nome_editado} | CID: {patologia_editada}")
             st.dataframe(df_final, use_container_width=True)
             st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {soma_total_geral/100:,.2f}")
             
