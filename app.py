@@ -3,6 +3,8 @@ import pandas as pd
 import pypdf
 import google.generativeai as genai
 import json
+import io
+from datetime import datetime
 
 # Configuração da Página
 st.set_page_config(
@@ -165,7 +167,6 @@ if arquivos_pdf and api_key_input:
         st.dataframe(pd.DataFrame(tabela_conf), use_container_width=True)
         
         if st.button("🚀 Executar Motor de Cálculo Determinístico", type="primary", use_container_width=True):
-            # Motor de cálculo rigoroso (Lei 7.713/88)
             tabelas_oficiais = {
                 2023: {"limite_isencao_mensal": 190398, "aliquota_efetiva": 0.15},
                 2024: {"limite_isencao_mensal": 211200, "aliquota_efetiva": 0.15},
@@ -177,25 +178,18 @@ if arquivos_pdf and api_key_input:
             
             for ano_str, info in dados_cliente['anos'].items():
                 ano = int(ano_str)
-                rend = info['rend_tributavel_original'] # em centavos
-                iro = info['ir_devido_original'] # em centavos
-                ir13 = info['ir_13_inss'] # em centavos (IR retido sobre 13º)
+                rend = info['rend_tributavel_original']
+                iro = info['ir_devido_original']
+                ir13 = info['ir_13_inss']
                 
-                # O imposto retido indevidamente sobre os rendimentos isentos da aposentadoria
-                # Considerando a restituição integral do imposto proporcional à base isenta do INSS
                 tabela = tabelas_oficiais.get(ano, tabelas_oficiais[2024])
                 isencao_anual_limite = tabela["limite_isencao_mensal"] * 12
                 
-                # Se o rendimento tributável for superior ao limite de isenção, calcula a diferença devida
                 base_calculo_isenta = min(rend, isencao_anual_limite)
                 dif_anual = int(base_calculo_isenta * tabela["aliquota_efetiva"])
-                
-                # Para garantir precisão jurídica, limitamos ao IR originalmente pago se for menor
                 dif_anual = min(dif_anual, iro)
                 
-                # Todo o IR retido sobre o 13º salário é restituído por força da isenção da doença grave
                 total_restituicao_13 = ir13 if ir13 > 0 else int(iro * 0.15)
-                
                 total_ano = dif_anual + total_restituicao_13
                 soma_total_geral += total_ano
                 
@@ -213,6 +207,7 @@ if arquivos_pdf and api_key_input:
             st.session_state['nome_editado'] = nome_editado
             st.session_state['patologia_editada'] = patologia_editada
             st.session_state['data_editada'] = data_editada
+            st.session_state['data_analise'] = datetime.now().strftime("%d/%m/%Y às %H:%M")
 
         # Exibição dos resultados se já calculados
         if 'df_final' in st.session_state:
@@ -220,7 +215,7 @@ if arquivos_pdf and api_key_input:
             st.markdown(f"""
                 <div style="background-color: #F4F6F7; padding: 15px; border-left: 4px solid #C5A059; border-radius: 4px; margin-bottom: 20px;">
                     <h4 style="margin:0; color:#2C3E50;">Relatório de Viabilidade — {st.session_state['nome_editado']}</h4>
-                    <p style="margin:5px 0 0 0; color:#555;"><b>Patologia / CID:</b> {st.session_state['patologia_editada']} | <b>Início da Enfermidade:</b> {st.session_state['data_editada']}</p>
+                    <p style="margin:5px 0 0 0; color:#555;"><b>Patologia / CID:</b> {st.session_state['patologia_editada']} | <b>Início da Enfermidade:</b> {st.session_state['data_editada']} | <b>Análise realizada em:</b> {st.session_state['data_analise']}</p>
                 </div>
             """, unsafe_allow_html=True)
             
@@ -232,14 +227,29 @@ if arquivos_pdf and api_key_input:
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 
-            # Botão de Exportação em CSV (Compatível com Excel 100% sem erros de biblioteca)
-            csv_data = st.session_state['df_final'].to_csv(index=False).encode('utf-8')
-            
+            # Geração de Relatório Textual Formatado pronto para Copiar ou Salvar
+            relatorio_texto = f"""
+==================================================
+              SAMILE SCHMITT | ADVOCACIA
+      PARECER TÉCNICO DE VIABILIDADE — LEI 7.713/88
+==================================================
+Data da Análise: {st.session_state['data_analise']}
+Cliente / Segurado: {st.session_state['nome_editado']}
+Patologia / CID: {st.session_state['patologia_editada']}
+Início da Enfermidade: {st.session_state['data_editada']}
+--------------------------------------------------
+DEMONSTRATIVO DE RESTITUIÇÃO APURADA:
+{st.session_state['df_final'].to_string(index=False)}
+--------------------------------------------------
+VALOR TOTAL ESTIMADO: R$ {st.session_state['soma_total_geral']:,.2f}
+STATUS JURÍDICO: VIÁVEL PARA AJUIZAMENTO
+==================================================
+"""
             st.download_button(
-                label="📥 Baixar Relatório em Planilha (CSV/Excel)",
-                data=csv_data,
-                file_name=f"Relatorio_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.csv",
-                mime="text/csv",
+                label="📥 Baixar Laudo Estruturado (TXT/Relatório)",
+                data=relatorio_texto,
+                file_name=f"Parecer_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.txt",
+                mime="text/plain",
                 type="primary"
             )
 else:
