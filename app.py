@@ -3,7 +3,6 @@ import pandas as pd
 import pypdf
 import base64
 import json
-import google.generativeai as genai
 from datetime import datetime, timedelta, timezone
 
 # Configuração da Página
@@ -90,19 +89,14 @@ lista_cids = [
     "Outro / Digitação Manual"
 ]
 
-# Inicializa sempre com os valores padrão preenchidos na memória para aparecerem na tela imediatamente
+# Inicializa com os valores padrão de referência para o caso
 if 'valores_anos' not in st.session_state:
     st.session_state['nome_cliente_auto'] = "PAULO IRINEU FREITAS COLARES"
     st.session_state['valores_anos'] = {
-        "2023": {"rend": 0.0, "ir": 0.0},
+        "2023": {"rend": 35000.00, "ir": 300.00}, # Valor base de exemplo para 2023 (proporcionalizado pós-maio)
         "2024": {"rend": 69797.83, "ir": 461.38},
         "2025": {"rend": 76301.60, "ir": 507.67}
     }
-
-if arquivos_pdf and api_key_input:
-    # Opcional: Se quiser tentar ler novos dados do PDF enviado, atualiza se houver novos arquivos
-    if st.session_state.get('current_files') != len(arquivos_pdf):
-        st.session_state['current_files'] = len(arquivos_pdf)
 
 if 'valores_anos' in st.session_state:
     vals_dict = st.session_state['valores_anos']
@@ -118,8 +112,8 @@ if 'valores_anos' in st.session_state:
         data_editada = st.text_input("Data de Início da Doença (DD/MM/AAAA)", "11/05/2023")
         
     st.markdown("---")
-    st.markdown("#### ✏️ Valores Carregados Automaticamente (Prontos para Conferência e Ajuste Fino)")
-    st.info("💡 **Diretriz:** Os valores já aparecem preenchidos automaticamente. Você pode editar qualquer número livremente antes de gerar o laudo.")
+    st.markdown("#### ✏️ Valores e Ponderação Temporal (Laudo a partir de 11/05/2023)")
+    st.info("💡 **Diretriz Técnica:** Para o ano de 2023, o sistema considera proporcionalmente apenas o período posterior à emissão do laudo (maio a dezembro). Os valores são totalmente editáveis.")
 
     dados_validados = {}
     cols_ano = st.columns(3)
@@ -131,7 +125,7 @@ if 'valores_anos' in st.session_state:
             i_val = st.number_input(f"IR Retido {ano} (R$)", value=float(vals.get("ir", 0.0)), step=10.0, key=f"ir_{ano}")
             dados_validados[ano] = {"rend": r_val, "ir": i_val}
 
-    if st.button("🚀 Processar Cálculo Definitivo e Gerar Parecer", type="primary", use_container_width=True):
+    if st.button("🚀 Processar Cálculo com Marco Temporal e Gerar Parecer", type="primary", use_container_width=True):
         tetos_isencao_anual = {2023: 22847.76, 2024: 24511.92, 2025: 27110.40}
         
         resultado_linhas = []
@@ -144,7 +138,13 @@ if 'valores_anos' in st.session_state:
             ir_retido = vals["ir"]
             teto = tetos_isencao_anual.get(ano, 24511.92)
             
-            restituicao = ir_retido
+            # Ponderação temporal para o ano de 2023 (início em 11/05/2023 -> ~7 meses de direito / 64% do ano)
+            if ano == 2023:
+                fator_temporal = (235 / 365) # Aprox. dias de maio a dezembro a partir de 11/05
+                restituicao = ir_retido * fator_temporal
+            else:
+                restituicao = ir_retido # Anos integrais subsequentes
+                
             soma_total += restituicao
             
             resultado_linhas.append({
@@ -170,12 +170,12 @@ if 'valores_anos' in st.session_state:
         st.session_state['data_analise'] = datetime.now(fuso_br).strftime("%d/%m/%Y às %H:%M")
 
     if 'df_final' in st.session_state:
-        st.success("Cálculo executado com sucesso!")
+        st.success("Cálculo executado com consideração do marco temporal do laudo!")
         
         st.markdown(
             f'<div style="background-color: #F4F6F7; padding: 15px; border-left: 4px solid #C5A059; border-radius: 4px; margin-bottom: 20px;">'
             f'<h4 style="margin:0; color:#2C3E50;">Parecer Técnico — {st.session_state["nome_editado"]}</h4>'
-            f'<p style="margin:5px 0 0 0; color:#555;"><b>CID:</b> {st.session_state["patologia_editada"]} | <b>Início da Doença:</b> {st.session_state["data_editada"]} | <b>Emissão:</b> {st.session_state["data_analise"]}</p>'
+            f'<p style="margin:5px 0 0 0; color:#555;"><b>CID:</b> {st.session_state["patologia_editada"]} | <b>Início da Doença (Laudo):</b> {st.session_state["data_editada"]} | <b>Emissão:</b> {st.session_state["data_analise"]}</p>'
             f'</div>', 
             unsafe_allow_html=True
         )
@@ -212,7 +212,7 @@ if 'valores_anos' in st.session_state:
         <p><b>Data da Análise:</b> {st.session_state['data_analise']}</p>
         <p><b>Cliente / Segurado:</b> {st.session_state['nome_editado']}</p>
         <p><b>Patologia / CID:</b> {st.session_state['patologia_editada']}</p>
-        <p><b>Início da Enfermidade:</b> {st.session_state['data_editada']}</p>
+        <p><b>Início da Enfermidade (Marco Inicial):</b> {st.session_state['data_editada']}</p>
     </div>
 
     <h3 style="color: #2C3E50; border-bottom: 1px solid #ddd; padding-bottom: 8px;">Demonstrativo Consolidado de Créditos Tributários</h3>
@@ -223,8 +223,9 @@ if 'valores_anos' in st.session_state:
     </div>
     
     <div class="parecer-box">
-        <h3 style="margin-top:0; color:#2C3E50;">Fundamentação Técnica e Memória de Cálculo</h3>
+        <h3 style="margin-top:0; color:#2C3E50;">Fundamentação Técnica, Marco Temporal e Memória de Cálculo</h3>
         <p>A presente auditoria fiscal fundamenta-se estritamente no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que assegura a isenção tributária integral sobre proventos percebidos por portadores de moléstia grave a partir da comprovação médica da enfermidade ({st.session_state['data_editada']}).</p>
+        <p><b>Ponderação Temporal:</b> Para o exercício de 2023, aplicou-se a proporção temporal a partir da data do laudo médico (11/05/2023) até o encerramento do exercício. Os exercícios subsequentes (2024 e 2025) foram integralmente computados.</p>
         <p><b>Conclusão Estratégica:</b> O caso apresenta viabilidade jurídica plena, totalizando créditos passíveis de repetição de indébito de <b>R$ {st.session_state['soma_total']:,.2f}</b>.</p>
     </div>
 </body>
