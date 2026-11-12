@@ -64,6 +64,17 @@ with st.sidebar:
         accept_multiple_files=True
     )
 
+def extrair_texto_pdfs(files):
+    texto_total = ""
+    for file in files:
+        try:
+            leitor = pypdf.PdfReader(file)
+            for pagina in leitor.pages:
+                texto_total += pagina.extract_text() + "\n"
+        except Exception as e:
+            st.warning(f"⚠️ Aviso: Falha ao ler o arquivo '{file.name}'.")
+    return texto_total
+
 lista_cids = [
     "C20 - Neoplasia Maligna (Reto / Intestino)",
     "C50 - Neoplasia Maligna de Mama",
@@ -169,7 +180,7 @@ if 'valores_anos' in st.session_state:
         st.dataframe(st.session_state['df_final'], use_container_width=True)
         st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {st.session_state['soma_total']:,.2f}")
         
-        # Montagem do HTML sem f-strings complexas para evitar erros de sintaxe
+        # HTML estruturado com script de impressão direta optimizada para PDF
         html_relatorio = (
             "<!DOCTYPE html><html><head><meta charset='utf-8'>"
             "<style>"
@@ -187,7 +198,7 @@ if 'valores_anos' in st.session_state:
             "@media print { .no-print { display: none; } body { padding: 0; } }"
             "</style></head><body>"
             "<div style='text-align: center; margin-bottom: 30px;' class='no-print'>"
-            "<button onclick='window.print()' style='background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 12px 25px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>🖨️ Salvar Diretamente em PDF (Imprimir / Salvar)</button>"
+            "<button onclick='window.print()' style='background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 12px 25px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>🖨️ Salvar Diretamente em PDF</button>"
             "</div>"
             "<div class='header'><h1>Samile Schmitt</h1><p>A D V O C A C I A</p><div class='sub'>Parecer Técnico Previdenciário / Tributário — Isenção de IR (Lei 7.713/88)</div></div>"
             "<div class='info-box'>"
@@ -208,9 +219,9 @@ if 'valores_anos' in st.session_state:
         )
 
         b64 = base64.b64encode(html_relatorio.encode()).decode()
-        nome_arquivo = f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html"
+        nome_arquivo = f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.pdf"
         
-        href = f'<a href="data:text/html;base64,{b64}" download="{nome_arquivo}" style="text-decoration: none;"><button style="background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 0.7rem 1.5rem; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Baixar Relatório Oficial</button></a>'
+        href = f'<a href="data:application/pdf;base64,{b64}" download="{nome_arquivo}" style="text-decoration: none;"><button style="background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 0.7rem 1.5rem; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Baixar Laudo Oficial em PDF</button></a>'
         
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown(href, unsafe_allow_html=True)
