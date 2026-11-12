@@ -82,7 +82,7 @@ def extrair_dados_fiscais(texto_documentos, api_key):
     model = genai.GenerativeModel('gemini-3.8-flash')
     
     prompt = f"""
-    Você é um auditor fiscal especialista em imposto de renda. Analise o texto e retorne estritamente UM JSON PURO (sem blocos de markdown) com os valores nominais EXATOS em Reais (com ponto decimal se houver, ex: 69797.83) de Rendimentos Tributáveis e Imposto Retido na Fonte (IRRF) para os anos de 2023, 2024 e 2025. Se não achar, coloque 0.
+    Você é um auditor fiscal especialista em imposto de renda. Analise o texto e retorne estritamente UM JSON PURO (sem blocos de markdown) com os valores nominais EXATOS em Reais de "Rendimentos Tributáveis Recebidos de PJ ou PF" e o "Imposto de Renda Retido na Fonte (IRRF)" para os anos de 2023, 2024 e 2025. Se não achar, coloque 0.0.
     {{
       "nome_cliente": "Nome completo do contribuinte",
       "anos": {{
@@ -115,34 +115,33 @@ lista_cids = [
 ]
 
 if arquivos_pdf and api_key_input:
-    st.success(f"✨ {len(arquivos_pdf)} documento(s) carregado(s) com sucesso.")
-    
-    if st.button("🤖 Ler e Extrair Dados dos Documentos", type="primary"):
-        with st.spinner("Lendo os dados fiscais..."):
+    # Se os arquivos foram carregados e ainda não temos dados extraídos na sessão, rodamos a IA automaticamente
+    if 'res_ia' not in st.session_state or st.session_state.get('current_files') != len(arquivos_pdf):
+        with st.spinner("Lendo os documentos fiscais automaticamente..."):
             texto = extrair_texto_pdfs(arquivos_pdf)
             res = extrair_dados_fiscais(texto, api_key_input)
             if res:
                 st.session_state['res_ia'] = res
+                st.session_state['current_files'] = len(arquivos_pdf)
             else:
-                st.error("Erro na leitura automática.")
+                st.error("Erro na leitura automática. Verifique os documentos.")
 
-    # Se a IA leu ou se já temos dados salvos, permitimos a conferência e ajuste manual absoluto
     if 'res_ia' in st.session_state:
         res = st.session_state['res_ia']
         
         st.markdown("### 📋 Dados Cadastrais e Auditoria de Valores")
         col1, col2, col3 = st.columns(3)
         with col1:
-            nome_editado = st.text_input("Segurado / Cliente", res.get("nome_cliente", "PAULO IRINEU FREITAS COLARES"))
+            nome_editado = st.text_input("Segurado / Cliente", res.get("nome_cliente", "Contribuinte"))
         with col2:
             cid_selecionado = st.selectbox("Patologia / CID", lista_cids)
-            patologia_editada = st.text_input("CID Específico", "C20 - Neoplasia Maligna (Reto / Intestino)")
+            patologia_editada = st.text_input("CID Específico", cid_selecionado)
         with col3:
             data_editada = st.text_input("Data de Início da Doença (DD/MM/AAAA)", "11/05/2023")
             
         st.markdown("---")
-        st.markdown("#### ✏️ Validação e Ajuste de Valores (Garantia 100% Confiável)")
-        st.info("💡 **Garantia do Escritório:** Confira e ajuste abaixo os valores extraídos para garantir que batem exatamente com a declaração oficial antes de gerar o laudo.")
+        st.markdown("#### ✏️ Valores Extraídos (Prontos para Conferência e Ajuste Fino)")
+        st.info("💡 **Diretriz:** O sistema já preencheu abaixo os valores extraídos dos PDFs. Se notar qualquer divergência, basta ajustar diretamente nos campos antes de gerar o laudo.")
 
         anos_dict = res.get("anos", {"2023": {"rend": 0, "ir": 0}, "2024": {"rend": 0, "ir": 0}, "2025": {"rend": 0, "ir": 0}})
         
@@ -156,7 +155,7 @@ if arquivos_pdf and api_key_input:
                 i_val = st.number_input(f"IR Retido {ano} (R$)", value=float(vals.get("ir", 0.0)), step=10.0, key=f"ir_{ano}")
                 dados_validados[ano] = {"rend": r_val, "ir": i_val}
 
-        if st.button("🚀 Executar Cálculo Definitivo e Gerar Parecer", type="primary", use_container_width=True):
+        if st.button("🚀 Processar Cálculo Definitivo e Gerar Parecer", type="primary", use_container_width=True):
             tetos_isencao_anual = {2023: 22847.76, 2024: 24511.92, 2025: 27110.40}
             
             resultado_linhas = []
@@ -169,7 +168,6 @@ if arquivos_pdf and api_key_input:
                 ir_retido = vals["ir"]
                 teto = tetos_isencao_anual.get(ano, 24511.92)
                 
-                # O indébito tributário é o imposto retido na fonte sobre os proventos protegidos
                 restituicao = ir_retido
                 soma_total += restituicao
                 
@@ -196,7 +194,7 @@ if arquivos_pdf and api_key_input:
             st.session_state['data_analise'] = datetime.now(fuso_br).strftime("%d/%m/%Y às %H:%M")
 
         if 'df_final' in st.session_state:
-            st.success("Cálculo determinístico executado com sucesso!")
+            st.success("Cálculo executado com sucesso!")
             st.markdown(f"""
                 <div style="background-color: #F4F6F7; padding: 15px; border-left: 4px solid #C5A059; border-radius: 4px; margin-bottom: 20px;">
                     <h4 style="margin:0; color:#2C3E50;">Parecer Técnico — {st.session_state['nome_editado']}</h4>
@@ -207,7 +205,6 @@ if arquivos_pdf and api_key_input:
             st.dataframe(st.session_state['df_final'], use_container_width=True)
             st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {st.session_state['soma_total']:,.2f}")
             
-            # Geração de HTML limpo para download direto
             html_relatorio = f"""<!DOCTYPE html>
 <html>
 <head>
