@@ -77,7 +77,6 @@ def extrair_texto_pdfs(files):
             st.warning(f"⚠️ Aviso: Falha ao ler o arquivo '{file.name}'.")
     return texto_total
 
-# Extração focada exclusivamente em mapear os valores declarados sem distorção
 def extrair_dados_fiscais(texto_documentos, api_key):
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-3.8-flash')
@@ -150,7 +149,6 @@ if arquivos_pdf and api_key_input:
             
         st.markdown("---")
         st.markdown("#### 📊 Conferência de Valores Extraídos dos PDFs")
-        st.info("💡 **Dica de Auditoria:** Confira abaixo se os valores extraídos batem com as declarações oficiais antes de rodar o cálculo final.")
         
         tabela_conf = []
         for ano, info in dados_cliente['anos'].items():
@@ -180,8 +178,6 @@ if arquivos_pdf and api_key_input:
                 tabela = tabelas_oficiais.get(ano, tabelas_oficiais[2024])
                 limite_anual = tabela["limite_isencao_mensal"] * 12
                 
-                # Cálculo determinístico: se há rendimento isento por doença grave, 
-                # o imposto retido sobre a faixa isenta constitui indébito tributário integral.
                 base_isenta = min(rend, limite_anual)
                 restituicao_anual = int(base_isenta * tabela["aliquota"])
                 restituicao_anual = min(restituicao_anual, ir_retido)
@@ -230,7 +226,7 @@ if arquivos_pdf and api_key_input:
                 * **Exercício {item['ano']}**: 
                   * *Rendimento Tributável Declarado*: R$ {item['rend']:,.2f}
                   * *Imposto Retido na Fonte (IRRF)*: R$ {item['ir_retido']:,.2f}
-                  * *Indébito Apurado (Restituição Lei 7.713/88)*: **R$ {item['restituição']:,.2f}**
+                  * *Indébito Apurado (Restituição Lei 7.713/88)*: **R$ {item['restituicao']:,.2f}**
                 """)
 
             if st.session_state['soma_total_geral'] > 0:
