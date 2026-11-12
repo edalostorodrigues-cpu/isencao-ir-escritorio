@@ -66,12 +66,16 @@ with st.sidebar:
         accept_multiple_files=True
     )
 
+# Função blindada para extrair texto dos PDFs (ignora arquivos corrompidos sem quebrar o app)
 def extrair_texto_pdfs(files):
     texto_total = ""
     for file in files:
-        leitor = pypdf.PdfReader(file)
-        for pagina in leitor.pages:
-            texto_total += pagina.extract_text() + "\n"
+        try:
+            leitor = pypdf.PdfReader(file)
+            for pagina in leitor.pages:
+                texto_total += pagina.extract_text() + "\n"
+        except Exception as e:
+            st.warning(f"⚠️ Aviso: O arquivo '{file.name}' apresentou falha na leitura ou está corrompido e foi ignorado.")
     return texto_total
 
 def analisar_documentos_com_ia(texto_documentos, api_key):
@@ -121,8 +125,11 @@ if arquivos_pdf and api_key_input:
     if st.button("🤖 Processar Leitura Inteligente com IA", type="primary"):
         with st.spinner("A Inteligência Artificial está auditando os documentos..."):
             texto_extraido = extrair_texto_pdfs(arquivos_pdf)
-            dados_cliente = analisar_documentos_com_ia(texto_extraido, api_key_input)
-            st.session_state['dados_cliente'] = dados_cliente
+            if texto_extraido.strip():
+                dados_cliente = analisar_documentos_com_ia(texto_extraido, api_key_input)
+                st.session_state['dados_cliente'] = dados_cliente
+            else:
+                st.error("Nenhum texto legível foi extraído dos PDFs. Verifique se os arquivos não estão corrompidos.")
 
     if 'dados_cliente' in st.session_state and st.session_state['dados_cliente']:
         dados_cliente = st.session_state['dados_cliente']
@@ -236,7 +243,6 @@ if arquivos_pdf and api_key_input:
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 
-            # Geração de Relatório Formatado para Impressão em PDF via navegador
             html_relatorio = f"""<!DOCTYPE html>
 <html>
 <head>
