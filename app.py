@@ -52,18 +52,16 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Tenta carregar a chave dos segredos do Streamlit
-api_key_secret = ""
-try:
-    api_key_secret = st.secrets.get("GEMINI_API_KEY", "")
-except:
-    pass
-
 # Barra Lateral Profissional
 with st.sidebar:
     st.markdown("### ⚖️ Painel do Escritório")
     st.markdown("---")
-    st.info("Envie os documentos fiscais do cliente. O motor de IA estruturará os dados automaticamente.")
+    st.info("Insira sua chave e envie os documentos fiscais do cliente.")
+    
+    # Campo obrigatório para digitar a chave da API diretamente na tela
+    api_key_input = st.text_input("Chave da API Gemini", type="password", help="Insira sua chave do Google AI Studio (iniciada com AIzaSy).")
+    
+    st.markdown("---")
     
     # Upload dos PDFs
     arquivos_pdf = st.file_uploader(
@@ -71,15 +69,6 @@ with st.sidebar:
         type=["pdf"], 
         accept_multiple_files=True
     )
-    
-    st.markdown("---")
-    
-    # Se não houver chave nos segredos, mostra o campo de texto para digitar
-    if not api_key_secret:
-        api_key_input = st.text_input("Chave da API Gemini", type="password", help="Insira sua chave do Google AI Studio.")
-    else:
-        api_key_input = api_key_secret
-        st.success("🔒 Chave da API carregada com segurança.")
 
 # Função para extrair texto dos PDFs enviados
 def extrair_texto_pdfs(files):
@@ -93,7 +82,6 @@ def extrair_texto_pdfs(files):
 # Função que usa o Gemini para extrair os dados estruturados dos documentos
 def analisar_documentos_com_ia(texto_documentos, api_key):
     genai.configure(api_key=api_key)
-    # Atualizado para o modelo padrão estável do Gemini
     model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""
@@ -253,45 +241,4 @@ if arquivos_pdf and api_key_input:
                     table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
                     th, td {{ border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }}
                     th {{ background-color: #2C3E50; color: white; }}
-                    .total {{ font-size: 18px; font-weight: bold; color: #2C3E50; margin-top: 20px; text-align: right; }}
-                    .status {{ margin-top: 20px; padding: 10px; background: #E8F8F5; color: #117A65; font-weight: bold; text-align: center; border-radius: 5px; }}
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h2>Samile Schmitt</h2>
-                    <p>A D V O C A C I A</p>
-                    <p style="color: #666; font-weight: normal; font-size: 11px; margin-top: 5px;">Parecer Técnico de Viabilidade — Isenção de IR (Lei 7.713/88)</p>
-                </div>
-                <div class="info">
-                    <p><b>Data da Análise:</b> {st.session_state['data_analise']}</p>
-                    <p><b>Cliente / Segurado:</b> {st.session_state['nome_editado']}</p>
-                    <p><b>Patologia / CID:</b> {st.session_state['patologia_editada']}</p>
-                    <p><b>Início da Enfermidade:</b> {st.session_state['data_editada']}</p>
-                </div>
-                <h3>Demonstrativo de Valores a Recuperar</h3>
-                {st.session_state['df_final'].to_html(index=False, classes='table')}
-                <div class="total">
-                    Valor Total Estimado: R$ {st.session_state['soma_total_geral']:,.2f}
-                </div>
-                <div class="status">
-                    STATUS: VIÁVEL PARA AJUIZAMENTO — Há direito creditício recuperável a favor do segurado.
-                </div>
-            </body>
-            </html>
-            """
-            
-            st.download_button(
-                label="📥 Baixar Laudo Completo em HTML/PDF (Pronto para Impressão)",
-                data=html_relatorio,
-                file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html",
-                mime="text/html",
-                type="primary"
-            )
-else:
-    st.markdown("""
-        <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 20px;">
-            <h3 style="color: #2C3E50;">Bem-vindo ao Sistema de Isenção</h3>
-            <p style="color: #666;">Faça o upload dos documentos digitalizados na barra lateral para iniciar a análise jurídica automatizada.</p>
-        </div>
-    """, unsafe_allow_html=True)
+                    .total {{ font-size: 18px; font-weight: bold; color: #2C3E
