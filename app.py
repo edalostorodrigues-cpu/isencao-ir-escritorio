@@ -4,6 +4,7 @@ import pypdf
 import google.generativeai as genai
 import json
 import io
+from datetime import datetime
 
 # Configuração da Página
 st.set_page_config(
@@ -45,7 +46,7 @@ st.markdown("""
 st.markdown("""
     <div style="text-align: center; padding: 10px 0 20px 0;">
         <h2 style="color: #2C3E50; font-family: 'Georgia', serif; margin-bottom: 0;">Samile Schmitt</h2>
-        <p style="letter-spacing: 5px; color: #997A38; font-size: 13px; font-weight: bold; margin-top: 5px;">A D V O C A C IA</p>
+        <p style="letter-spacing: 5px; color: #997A38; font-size: 13px; font-weight: bold; margin-top: 5px;">A D V O C A C I A</p>
         <hr style="width: 140px; border: 1px solid #C5A059; margin: 15px auto;">
         <h4 style="color: #555; font-weight: normal; font-size: 15px; margin-top: 5px;">Módulo de Análise Inteligente e Cálculo de Isenção de IR (Doença Grave)</h4>
     </div>
@@ -151,10 +152,12 @@ if arquivos_pdf and api_key_input:
             else:
                 patologia_editada = cid_selecionado
         with col3:
-            # Seletor de Data Visual (Calendário)
+            # Seletor de Data Visual formatado em DD/MM/AAAA para o padrão brasileiro
             import datetime
-            data_laudo = st.date_input("Data de Início da Doença (Calendário)", value=datetime.date(2023, 1, 15))
+            data_laudo = st.date_input("Data de Início da Doença (DD/MM/AAAA)", value=datetime.date(2023, 1, 15))
+            # Formata explicitamente para o padrão brasileiro
             data_editada = data_laudo.strftime("%d/%m/%Y")
+            st.caption(f"📅 Data selecionada: **{data_editada}**")
             
         st.markdown("---")
         st.markdown("#### 📊 Demonstrativo de Valores Originais Extraídos")
@@ -187,76 +190,3 @@ if arquivos_pdf and api_key_input:
                 iro = info['ir_devido_original']
                 ir13 = info['ir_13_inss']
                 fator = info['fator_inss_isento']
-                
-                inss_isento = int(inss * fator)
-                rend_restante = rend - inss_isento
-                nova_base = max(0, rend_restante - ded)
-                
-                tabela = tabelas_oficiais.get(ano, tabelas_oficiais[2024])
-                if nova_base <= tabela["limite_isencao"]:
-                    ir_simulado = 0
-                else:
-                    excedente = nova_base - tabela["limite_isencao"]
-                    ir_simulado = int(excedente * tabela["aliquota"])
-                    
-                dif_anual = iro - ir_simulado
-                total_ano = dif_anual + ir13
-                soma_total_geral += total_ano
-                
-                resultado_linhas.append({
-                    "Ano": ano,
-                    "Diferença Anual (R$)": round(dif_anual / 100, 2),
-                    "IR do 13º (R$)": round(ir13 / 100, 2),
-                    "Total Estimado (R$)": round(total_ano / 100, 2)
-                })
-                
-            df_final = pd.DataFrame(resultado_linhas)
-            
-            # Salva na sessão para o botão de exportar Excel
-            st.session_state['df_final'] = df_final
-            st.session_state['soma_total_geral'] = soma_total_geral / 100
-            st.session_state['nome_editado'] = nome_editado
-            st.session_state['patologia_editada'] = patologia_editada
-            st.session_state['data_editada'] = data_editada
-
-        # Exibição dos resultados se já calculados
-        if 'df_final' in st.session_state:
-            st.success("Cálculo jurídico executado com sucesso!")
-            st.markdown(f"""
-                <div style="background-color: #F4F6F7; padding: 15px; border-left: 4px solid #C5A059; border-radius: 4px; margin-bottom: 20px;">
-                    <h4 style="margin:0; color:#2C3E50;">Relatório de Viabilidade — {st.session_state['nome_editado']}</h4>
-                    <p style="margin:5px 0 0 0; color:#555;"><b>Patologia / CID:</b> {st.session_state['patologia_editada']} | <b>Início da Enfermidade:</b> {st.session_state['data_editada']}</p>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            st.dataframe(st.session_state['df_final'], use_container_width=True)
-            st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {st.session_state['soma_total_geral']:,.2f}")
-            
-            if st.session_state['soma_total_geral'] > 0:
-                st.markdown("🟢 **STATUS:** `VIÁVEL PARA AJUIZAMENTO` — Há direito creditício recuperável a favor do segurado.")
-            else:
-                st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
-
-            # Botão de Exportação para Excel (.xlsx)
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                # Aba de Resumo/Resultado
-                df_resumo = st.session_state['df_final']
-                df_resumo.to_excel(writer, sheet_name='Restituicao_IR', index=False)
-            
-            excel_data = output.getvalue()
-            
-            st.download_button(
-                label="📥 Baixar Relatório em Excel (XLSX)",
-                data=excel_data,
-                file_name=f"Relatorio_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                type="primary"
-            )
-else:
-    st.markdown("""
-        <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 20px;">
-            <h3 style="color: #2C3E50;">Bem-vindo ao Sistema de Isenção</h3>
-            <p style="color: #666;">Insira sua chave de API na barra lateral e faça o upload dos documentos digitalizados para iniciar a análise jurídica automatizada.</p>
-        </div>
-    """, unsafe_allow_html=True)
