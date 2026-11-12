@@ -195,7 +195,6 @@ if arquivos_pdf and api_key_input:
                 
             df_final = pd.DataFrame(resultado_linhas)
             
-            # Geração do Parecer Didático Baseado no Resultado
             if soma_total_geral > 0:
                 parecer_didatico = f"""
                 <div style="background-color: #FEF9E7; border-left: 5px solid #F39C12; padding: 20px; border-radius: 6px; margin-top: 20px; color: #2C3E50;">
@@ -244,11 +243,10 @@ if arquivos_pdf and api_key_input:
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 
-            # Exibe o parecer didático na tela
             st.markdown(st.session_state['parecer_didatico'], unsafe_allow_html=True)
 
-            # Geração de Relatório PDF Formatado com o Parecer Incluído
-            pdf_html = f"""<!DOCTYPE html>
+            # Geração de Relatório em formato HTML elegante para Impressão/PDF direto pelo navegador
+            html_relatorio = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
@@ -297,10 +295,10 @@ if arquivos_pdf and api_key_input:
 </html>"""
 
             st.download_button(
-                label="📥 Baixar Laudo Oficial em PDF com Parecer",
-                data=pdf_html,
-                file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.pdf",
-                mime="application/pdf",
+                label="📥 Baixar Laudo Oficial em HTML/PDF (Pronto para Impressão)",
+                data=html_relatorio,
+                file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html",
+                mime="text/html",
                 type="primary"
             )
 else:
