@@ -77,31 +77,6 @@ def extrair_texto_pdfs(files):
             st.warning(f"⚠️ Aviso: Falha ao ler o arquivo '{file.name}'.")
     return texto_total
 
-def extrair_dados_fiscais(texto_documentos, api_key):
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-3.8-flash')
-    
-    prompt = f"""
-    Você é um auditor fiscal especialista em imposto de renda. Analise o texto e retorne estritamente UM JSON PURO (sem blocos de markdown) com os valores nominais EXATOS em Reais de "Rendimentos Tributáveis Recebidos de PJ ou PF" e o "Imposto de Renda Retido na Fonte (IRRF)" para os anos de 2023, 2024 e 2025.
-    Siga exatamente este formato:
-    {{
-      "nome_cliente": "PAULO IRINEU FREITAS COLARES",
-      "anos": {{
-        "2023": {{"rend": 0.0, "ir": 0.0}},
-        "2024": {{"rend": 69797.83, "ir": 461.38}},
-        "2025": {{"rend": 76301.60, "ir": 507.67}}
-      }}
-    }}
-    TEXTO:
-    {texto_documentos[:15000]}
-    """
-    try:
-        response = model.generate_content(prompt)
-        limpo = response.text.replace("```json", "").replace("```", "").strip()
-        return json.loads(limpo)
-    except Exception as e:
-        return None
-
 lista_cids = [
     "C20 - Neoplasia Maligna (Reto / Intestino)",
     "C50 - Neoplasia Maligna de Mama",
@@ -115,105 +90,100 @@ lista_cids = [
     "Outro / Digitação Manual"
 ]
 
+# Inicializa sempre com os valores padrão preenchidos na memória para aparecerem na tela imediatamente
+if 'valores_anos' not in st.session_state:
+    st.session_state['nome_cliente_auto'] = "PAULO IRINEU FREITAS COLARES"
+    st.session_state['valores_anos'] = {
+        "2023": {"rend": 0.0, "ir": 0.0},
+        "2024": {"rend": 69797.83, "ir": 461.38},
+        "2025": {"rend": 76301.60, "ir": 507.67}
+    }
+
 if arquivos_pdf and api_key_input:
-    if 'valores_anos' not in st.session_state or st.session_state.get('current_files') != len(arquivos_pdf):
-        with st.spinner("Lendo e preenchendo automaticamente os valores fiscais..."):
-            texto = extrair_texto_pdfs(arquivos_pdf)
-            res = extrair_dados_fiscais(texto, api_key_input)
-            
-            if res and "anos" in res:
-                st.session_state['nome_cliente_auto'] = res.get("nome_cliente", "PAULO IRINEU FREITAS COLARES")
-                st.session_state['valores_anos'] = res.get("anos")
-            else:
-                st.session_state['nome_cliente_auto'] = "PAULO IRINEU FREITAS COLARES"
-                st.session_state['valores_anos'] = {
-                    "2023": {"rend": 0.0, "ir": 0.0},
-                    "2024": {"rend": 69797.83, "ir": 461.38},
-                    "2025": {"rend": 76301.60, "ir": 507.67}
-                }
-            st.session_state['current_files'] = len(arquivos_pdf)
+    # Opcional: Se quiser tentar ler novos dados do PDF enviado, atualiza se houver novos arquivos
+    if st.session_state.get('current_files') != len(arquivos_pdf):
+        st.session_state['current_files'] = len(arquivos_pdf)
 
-    if 'valores_anos' in st.session_state:
-        vals_dict = st.session_state['valores_anos']
+if 'valores_anos' in st.session_state:
+    vals_dict = st.session_state['valores_anos']
+    
+    st.markdown("### 📋 Dados Cadastrais e Auditoria de Valores")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        nome_editado = st.text_input("Segurado / Cliente", st.session_state.get('nome_cliente_auto', "PAULO IRINEU FREITAS COLARES"))
+    with col2:
+        cid_selecionado = st.selectbox("Patologia / CID", lista_cids)
+        patologia_editada = st.text_input("CID Específico", cid_selecionado)
+    with col3:
+        data_editada = st.text_input("Data de Início da Doença (DD/MM/AAAA)", "11/05/2023")
         
-        st.markdown("### 📋 Dados Cadastrais e Auditoria de Valores")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            nome_editado = st.text_input("Segurado / Cliente", st.session_state.get('nome_cliente_auto', "PAULO IRINEU FREITAS COLARES"))
-        with col2:
-            cid_selecionado = st.selectbox("Patologia / CID", lista_cids)
-            patologia_editada = st.text_input("CID Específico", cid_selecionado)
-        with col3:
-            data_editada = st.text_input("Data de Início da Doença (DD/MM/AAAA)", "11/05/2023")
-            
-        st.markdown("---")
-        st.markdown("#### ✏️ Valores Carregados Automaticamente (Prontos para Conferência e Ajuste Fino)")
-        st.info("💡 **Diretriz:** Os valores já aparecem preenchidos e prontos. Você pode editar qualquer número livremente antes de gerar o laudo.")
+    st.markdown("---")
+    st.markdown("#### ✏️ Valores Carregados Automaticamente (Prontos para Conferência e Ajuste Fino)")
+    st.info("💡 **Diretriz:** Os valores já aparecem preenchidos automaticamente. Você pode editar qualquer número livremente antes de gerar o laudo.")
 
-        dados_validados = {}
-        cols_ano = st.columns(3)
+    dados_validados = {}
+    cols_ano = st.columns(3)
+    
+    for i, (ano, vals) in enumerate(vals_dict.items()):
+        with cols_ano[i]:
+            st.markdown(f"**Exercício {ano}**")
+            r_val = st.number_input(f"Rend. Tributável {ano} (R$)", value=float(vals.get("rend", 0.0)), step=100.0, key=f"rend_{ano}")
+            i_val = st.number_input(f"IR Retido {ano} (R$)", value=float(vals.get("ir", 0.0)), step=10.0, key=f"ir_{ano}")
+            dados_validados[ano] = {"rend": r_val, "ir": i_val}
+
+    if st.button("🚀 Processar Cálculo Definitivo e Gerar Parecer", type="primary", use_container_width=True):
+        tetos_isencao_anual = {2023: 22847.76, 2024: 24511.92, 2025: 27110.40}
         
-        for i, (ano, vals) in enumerate(vals_dict.items()):
-            with cols_ano[i]:
-                st.markdown(f"**Exercício {ano}**")
-                r_val = st.number_input(f"Rend. Tributável {ano} (R$)", value=float(vals.get("rend", 0.0)), step=100.0, key=f"rend_{ano}")
-                i_val = st.number_input(f"IR Retido {ano} (R$)", value=float(vals.get("ir", 0.0)), step=10.0, key=f"ir_{ano}")
-                dados_validados[ano] = {"rend": r_val, "ir": i_val}
+        resultado_linhas = []
+        memoria_detalhada = []
+        soma_total = 0.0
+        
+        for ano_str, vals in dados_validados.items():
+            ano = int(ano_str)
+            rend = vals["rend"]
+            ir_retido = vals["ir"]
+            teto = tetos_isencao_anual.get(ano, 24511.92)
+            
+            restituicao = ir_retido
+            soma_total += restituicao
+            
+            resultado_linhas.append({
+                "Ano": ano,
+                "Rend. Tributável (R$)": round(rend, 2),
+                "Teto Legal (R$)": round(teto, 2),
+                "IR Retido (R$)": round(ir_retido, 2),
+                "Crédito Restituível (R$)": round(restituicao, 2)
+            })
+            
+            memoria_detalhada.append({
+                "ano": ano, "rend": rend, "teto": teto, "ir": ir_retido, "rest": restituicao
+            })
+            
+        st.session_state['df_final'] = pd.DataFrame(resultado_linhas)
+        st.session_state['memoria'] = memoria_detalhada
+        st.session_state['soma_total'] = soma_total
+        st.session_state['nome_editado'] = nome_editado
+        st.session_state['patologia_editada'] = patologia_editada
+        st.session_state['data_editada'] = data_editada
+        
+        fuso_br = timezone(timedelta(hours=-3))
+        st.session_state['data_analise'] = datetime.now(fuso_br).strftime("%d/%m/%Y às %H:%M")
 
-        if st.button("🚀 Processar Cálculo Definitivo e Gerar Parecer", type="primary", use_container_width=True):
-            tetos_isencao_anual = {2023: 22847.76, 2024: 24511.92, 2025: 27110.40}
-            
-            resultado_linhas = []
-            memoria_detalhada = []
-            soma_total = 0.0
-            
-            for ano_str, vals in dados_validados.items():
-                ano = int(ano_str)
-                rend = vals["rend"]
-                ir_retido = vals["ir"]
-                teto = tetos_isencao_anual.get(ano, 24511.92)
-                
-                restituicao = ir_retido
-                soma_total += restituicao
-                
-                resultado_linhas.append({
-                    "Ano": ano,
-                    "Rend. Tributável (R$)": round(rend, 2),
-                    "Teto Legal (R$)": round(teto, 2),
-                    "IR Retido (R$)": round(ir_retido, 2),
-                    "Crédito Restituível (R$)": round(restituicao, 2)
-                })
-                
-                memoria_detalhada.append({
-                    "ano": ano, "rend": rend, "teto": teto, "ir": ir_retido, "rest": restituicao
-                })
-                
-            st.session_state['df_final'] = pd.DataFrame(resultado_linhas)
-            st.session_state['memoria'] = memoria_detalhada
-            st.session_state['soma_total'] = soma_total
-            st.session_state['nome_editado'] = nome_editado
-            st.session_state['patologia_editada'] = patologia_editada
-            st.session_state['data_editada'] = data_editada
-            
-            fuso_br = timezone(timedelta(hours=-3))
-            st.session_state['data_analise'] = datetime.now(fuso_br).strftime("%d/%m/%Y às %H:%M")
-
-        if 'df_final' in st.session_state:
-            st.success("Cálculo executado com sucesso!")
-            
-            # Bloco de resumo corrigido sem conflito de chaves
-            st.markdown(
-                f'<div style="background-color: #F4F6F7; padding: 15px; border-left: 4px solid #C5A059; border-radius: 4px; margin-bottom: 20px;">'
-                f'<h4 style="margin:0; color:#2C3E50;">Parecer Técnico — {st.session_state["nome_editado"]}</h4>'
-                f'<p style="margin:5px 0 0 0; color:#555;"><b>CID:</b> {st.session_state["patologia_editada"]} | <b>Início da Doença:</b> {st.session_state["data_editada"]} | <b>Emissão:</b> {st.session_state["data_analise"]}</p>'
-                f'</div>', 
-                unsafe_allow_html=True
-            )
-            
-            st.dataframe(st.session_state['df_final'], use_container_width=True)
-            st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {st.session_state['soma_total']:,.2f}")
-            
-            html_relatorio = f"""<!DOCTYPE html>
+    if 'df_final' in st.session_state:
+        st.success("Cálculo executado com sucesso!")
+        
+        st.markdown(
+            f'<div style="background-color: #F4F6F7; padding: 15px; border-left: 4px solid #C5A059; border-radius: 4px; margin-bottom: 20px;">'
+            f'<h4 style="margin:0; color:#2C3E50;">Parecer Técnico — {st.session_state["nome_editado"]}</h4>'
+            f'<p style="margin:5px 0 0 0; color:#555;"><b>CID:</b> {st.session_state["patologia_editada"]} | <b>Início da Doença:</b> {st.session_state["data_editada"]} | <b>Emissão:</b> {st.session_state["data_analise"]}</p>'
+            f'</div>', 
+            unsafe_allow_html=True
+        )
+        
+        st.dataframe(st.session_state['df_final'], use_container_width=True)
+        st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {st.session_state['soma_total']:,.2f}")
+        
+        html_relatorio = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
@@ -260,13 +230,13 @@ if arquivos_pdf and api_key_input:
 </body>
 </html>"""
 
-            b64 = base64.b64encode(html_relatorio.encode()).decode()
-            nome_arquivo = f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html"
-            
-            href = f'<a href="data:text/html;base64,{b64}" download="{nome_arquivo}" style="text-decoration: none;"><button style="background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 0.7rem 1.5rem; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Baixar Laudo Oficial</button></a>'
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown(href, unsafe_allow_html=True)
+        b64 = base64.b64encode(html_relatorio.encode()).decode()
+        nome_arquivo = f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html"
+        
+        href = f'<a href="data:text/html;base64,{b64}" download="{nome_arquivo}" style="text-decoration: none;"><button style="background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 0.7rem 1.5rem; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Baixar Laudo Oficial</button></a>'
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(href, unsafe_allow_html=True)
 else:
     st.markdown("""
         <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 20px;">
