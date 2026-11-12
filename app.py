@@ -58,12 +58,10 @@ with st.sidebar:
     st.markdown("---")
     st.info("Insira sua chave e envie os documentos fiscais do cliente.")
     
-    # Campo para digitar a chave da API diretamente na tela
     api_key_input = st.text_input("Chave da API Gemini", type="password", help="Insira sua chave do Google AI Studio (iniciada com AIzaSy).")
     
     st.markdown("---")
     
-    # Upload dos PDFs
     arquivos_pdf = st.file_uploader(
         "Arraste os PDFs do Cliente (IRPF / HISCRE)", 
         type=["pdf"], 
@@ -79,27 +77,23 @@ def extrair_texto_pdfs(files):
             texto_total += pagina.extract_text() + "\n"
     return texto_total
 
-# Função que usa o Gemini para extrair os dados estruturados dos documentos
+# Função de Leitura Estrita via IA
 def analisar_documentos_com_ia(texto_documentos, api_key):
     genai.configure(api_key=api_key)
-    # Retornado para o modelo oficial indicado pelo Google no erro (gemini-3.8-flash)
     model = genai.GenerativeModel('gemini-3.8-flash')
     
     prompt = f"""
-    Você é um assistente jurídico sênior especializado em direito tributário e previdenciário (Lei 7.713/88).
-    Analise o texto extraído dos documentos do cliente abaixo e retorne um JSON estrito com a seguinte estrutura:
+    Você é um auditor fiscal especialista em imposto de renda. Extraia estritamente os valores reais encontrados nos documentos do contribuinte abaixo.
+    Retorne um JSON puro com esta estrutura exata, convertendo todos os valores financeiros em CENTAVOS (inteiros):
     {{
-      "nome_cliente": "Nome completo extraído ou 'Não localizado'",
-      "patologia_cid": "Patologia e CID descritos no laudo ou 'Não localizado'",
+      "nome_cliente": "Nome completo do contribuinte extraído",
+      "patologia_cid": "Não localizado",
       "anos": {{
-        "2023": {{"rend_tributavel_original": 0, "rend_inss": 0, "deducoes_legais": 0, "ir_devido_original": 0, "ir_13_inss": 0, "fator_inss_isento": 0.67}},
-        "2024": {{"rend_tributavel_original": 0, "rend_inss": 0, "deducoes_legais": 0, "ir_devido_original": 0, "ir_13_inss": 0, "fator_inss_isento": 1.0}},
-        "2025": {{"rend_tributavel_original": 0, "rend_inss": 0, "deducoes_legais": 0, "ir_devido_original": 0, "ir_13_inss": 0, "fator_inss_isento": 1.0}}
+        "2023": {{"rend_tributavel_original": 0, "rend_inss": 0, "deducoes_legais": 0, "ir_devido_original": 0, "ir_13_inss": 0}},
+        "2024": {{"rend_tributavel_original": 0, "rend_inss": 0, "deducoes_legais": 0, "ir_devido_original": 0, "ir_13_inss": 0}},
+        "2025": {{"rend_tributavel_original": 0, "rend_inss": 0, "deducoes_legais": 0, "ir_devido_original": 0, "ir_13_inss": 0}}
       }}
     }}
-    Nota: Todos os valores financeiros devem estar em CENTAVOS (inteiros). Exemplo: R$ 7.055,73 vira 705573.
-    Se algum ano não tiver dados no texto, estime valores médios realistas ou mantenha a estrutura base para teste.
-    
     TEXTO DOS DOCUMENTOS:
     {texto_documentos[:15000]}
     """
@@ -112,7 +106,6 @@ def analisar_documentos_com_ia(texto_documentos, api_key):
         st.error(f"Erro na extração por IA: {e}")
         return None
 
-# Lista de CIDs comuns de Doenças Graves (Lei 7.713/88)
 lista_cids = [
     "C20 - Neoplasia Maligna (Reto / Intestino)",
     "C50 - Neoplasia Maligna de Mama",
@@ -126,18 +119,15 @@ lista_cids = [
     "Outro / Digitação Manual"
 ]
 
-# Área Principal
 if arquivos_pdf and api_key_input:
     st.success(f"✨ {len(arquivos_pdf)} documento(s) carregado(s) com sucesso na base segura.")
     
-    # Botão para disparar a leitura controlada
     if st.button("🤖 Processar Leitura Inteligente com IA", type="primary"):
-        with st.spinner("A Inteligência Artificial está analisando os documentos do cliente..."):
+        with st.spinner("A Inteligência Artificial está auditando os documentos..."):
             texto_extraido = extrair_texto_pdfs(arquivos_pdf)
             dados_cliente = analisar_documentos_com_ia(texto_extraido, api_key_input)
             st.session_state['dados_cliente'] = dados_cliente
 
-    # Se já tiver os dados processados na sessão, exibe a interface de trabalho
     if 'dados_cliente' in st.session_state and st.session_state['dados_cliente']:
         dados_cliente = st.session_state['dados_cliente']
         
@@ -170,9 +160,9 @@ if arquivos_pdf and api_key_input:
         
         if st.button("🚀 Executar Motor de Cálculo Determinístico", type="primary", use_container_width=True):
             tabelas_oficiais = {
-                2023: {"limite_isencao_mensal": 190398, "aliquota_efetiva": 0.15},
-                2024: {"limite_isencao_mensal": 211200, "aliquota_efetiva": 0.15},
-                2025: {"limite_isencao_mensal": 225920, "aliquota_efetiva": 0.15}
+                2023: {"limite_isencao_mensal": 190398, "aliquota": 0.15},
+                2024: {"limite_isencao_mensal": 211200, "aliquota": 0.15},
+                2025: {"limite_isencao_mensal": 225920, "aliquota": 0.15}
             }
             
             resultado_linhas = []
@@ -185,13 +175,14 @@ if arquivos_pdf and api_key_input:
                 ir13 = info['ir_13_inss']
                 
                 tabela = tabelas_oficiais.get(ano, tabelas_oficiais[2024])
-                isencao_anual_limite = tabela["limite_isencao_mensal"] * 12
+                limite_anual = tabela["limite_isencao_mensal"] * 12
                 
-                base_calculo_isenta = min(rend, isencao_anual_limite)
-                dif_anual = int(base_calculo_isenta * tabela["aliquota_efetiva"])
+                base_isenta = min(rend, limite_anual)
+                dif_anual = int(base_isenta * tabela["aliquota"])
                 dif_anual = min(dif_anual, iro)
                 
-                total_restituicao_13 = ir13 if ir13 > 0 else int(iro * 0.15)
+                total_restituicao_13 = ir13 if ir13 > 0 else int(iro * 0.12)
+                
                 total_ano = dif_anual + total_restituicao_13
                 soma_total_geral += total_ano
                 
@@ -204,14 +195,38 @@ if arquivos_pdf and api_key_input:
                 
             df_final = pd.DataFrame(resultado_linhas)
             
+            # Geração do Parecer Didático Baseado no Resultado
+            if soma_total_geral > 0:
+                parecer_didatico = f"""
+                <div style="background-color: #FEF9E7; border-left: 5px solid #F39C12; padding: 20px; border-radius: 6px; margin-top: 20px; color: #2C3E50;">
+                    <h4 style="margin-top: 0; color: #B7950B;">⚖️ Parecer Técnico e Fundamentação Jurídica</h4>
+                    <p><b>Status: HÁ DIREITO AO AJUIZAMENTO (VIÁVEL)</b></p>
+                    <p><b>Por que há direito?</b> 
+                    Conforme o art. 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, os proventos de aposentadoria, reforma ou pensão recebidos por portadores de doenças graves (como a patologia informada CID <b>{patologia_editada}</b>, diagnosticada em <b>{data_editada}</b>) são isentos do Imposto de Renda.</p>
+                    <p><b>O que foi apurado nos cálculos?</b> 
+                    Verificou-se que o segurado sofreu retenções indevidas de Imposto de Renda na fonte sobre seus rendimentos previdenciários e sobre o 13º salário nos exercícios analisados. O montante total estimado de créditos tributários passíveis de restituição (respeitando o limite prescricional quinquenal) atinge a quantia de <b>R$ {soma_total_geral/100:,.2f}</b>.</p>
+                    <p><b>Conclusão:</b> Recomendam-se a propositura da ação judicial de restituição de indébito tributário cumulada com pedido de tutela antecipada para cessação imediata dos descontos em folha.</p>
+                </div>
+                """
+            else:
+                parecer_didatico = f"""
+                <div style="background-color: #FADBD8; border-left: 5px solid #E74C3C; padding: 20px; border-radius: 6px; margin-top: 20px; color: #2C3E50;">
+                    <h4 style="margin-top: 0; color: #C0392B;">⚖️ Parecer Técnico e Fundamentação Jurídica</h4>
+                    <p><b>Status: INVIÁVEL PARA AJUIZAMENTO NO PERÍODO</b></p>
+                    <p><b>Por que não há direito creditório apurado?</b> 
+                    Apesar da previsão legal de isenção da Lei nº 7.713/88 para a patologia informada, a análise fiscal dos documentos apresentados demonstrou que não houve retenção de Imposto de Renda tributável indébito no período, ou os rendimentos do segurado mantiveram-se integralmente dentro das faixas de isenção/tributação regular sem margem de indébito recuperável.</p>
+                    <p><b>Conclusão:</b> O caso não preenche os requisitos financeiros de vantagem econômica para restituição retroativa neste momento.</p>
+                </div>
+                """
+
             st.session_state['df_final'] = df_final
             st.session_state['soma_total_geral'] = soma_total_geral / 100
             st.session_state['nome_editado'] = nome_editado
             st.session_state['patologia_editada'] = patologia_editada
             st.session_state['data_editada'] = data_editada
             st.session_state['data_analise'] = datetime.now().strftime("%d/%m/%Y às %H:%M")
+            st.session_state['parecer_didatico'] = parecer_didatico
 
-        # Exibição dos resultados se já calculados
         if 'df_final' in st.session_state:
             st.success("Cálculo jurídico executado com sucesso!")
             st.markdown(f"""
@@ -229,7 +244,10 @@ if arquivos_pdf and api_key_input:
             else:
                 st.markdown("🔴 **STATUS:** `INVIÁVEL` — Sem diferença apurada no período.")
 
-            # Geração de Relatório PDF Formatado e Estilizado
+            # Exibe o parecer didático na tela
+            st.markdown(st.session_state['parecer_didatico'], unsafe_allow_html=True)
+
+            # Geração de Relatório PDF Formatado com o Parecer Incluído
             pdf_html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -246,7 +264,7 @@ if arquivos_pdf and api_key_input:
         th, td {{ border: 1px solid #EAE6DF; padding: 12px; text-align: left; font-size: 13px; }}
         th {{ background-color: #2C3E50; color: white; }}
         .total-box {{ font-size: 18px; font-weight: bold; color: #2C3E50; text-align: right; margin-top: 20px; padding: 15px; background: #F4F6F7; border-radius: 6px; }}
-        .status-box {{ margin-top: 20px; padding: 15px; background: #E8F8F5; color: #117A65; font-weight: bold; text-align: center; border-radius: 6px; font-size: 14px; }}
+        .parecer-box {{ background: #F9F9F9; border-left: 4px solid #C5A059; padding: 20px; margin-top: 30px; border-radius: 6px; font-size: 13px; line-height: 1.6; }}
     </style>
 </head>
 <body>
@@ -270,14 +288,16 @@ if arquivos_pdf and api_key_input:
         Valor Total Estimado da Restituição: R$ {st.session_state['soma_total_geral']:,.2f}
     </div>
     
-    <div class="status-box">
-        STATUS: VIÁVEL PARA AJUIZAMENTO — Há direito creditício recuperável a favor do segurado.
+    <div class="parecer-box">
+        <h3 style="margin-top:0; color:#2C3E50;">Fundamentação Técnica e Jurídica</h3>
+        <p>A presente análise foi realizada com base nas diretrizes da <b>Lei nº 7.713/88 (art. 6º, XIV)</b>, que assegura a isenção do Imposto de Renda sobre os proventos de aposentadoria e pensão percebidos por portadores de moléstia grave.</p>
+        <p>Constatou-se a existência de direito creditício recuperável em favor do segurado no montante total apurado de <b>R$ {st.session_state['soma_total_geral']:,.2f}</b>, configurando pleno respaldo legal para o ajuizamento da competente ação judicial de restituição de indébito tributário.</p>
     </div>
 </body>
 </html>"""
 
             st.download_button(
-                label="📥 Baixar Laudo Oficial em PDF",
+                label="📥 Baixar Laudo Oficial em PDF com Parecer",
                 data=pdf_html,
                 file_name=f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.pdf",
                 mime="application/pdf",
