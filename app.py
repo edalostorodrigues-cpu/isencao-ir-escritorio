@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import pypdf
 import base64
-import json
 from datetime import datetime, timedelta, timezone
 
 # Configuração da Página
@@ -64,17 +63,6 @@ with st.sidebar:
         type=["pdf"], 
         accept_multiple_files=True
     )
-
-def extrair_texto_pdfs(files):
-    texto_total = ""
-    for file in files:
-        try:
-            leitor = pypdf.PdfReader(file)
-            for pagina in leitor.pages:
-                texto_total += pagina.extract_text() + "\n"
-        except Exception as e:
-            st.warning(f"⚠️ Aviso: Falha ao ler o arquivo '{file.name}'.")
-    return texto_total
 
 lista_cids = [
     "C20 - Neoplasia Maligna (Reto / Intestino)",
@@ -181,20 +169,55 @@ if 'valores_anos' in st.session_state:
         st.dataframe(st.session_state['df_final'], use_container_width=True)
         st.metric(label="💰 VALOR TOTAL ESTIMADO DA RESTITUIÇÃO / ATRASADOS", value=f"R$ {st.session_state['soma_total']:,.2f}")
         
-        # HTML do relatório com script embutido para imprimir/salvar em PDF com um clique de forma nativa e profissional
-        html_relatorio = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body {{ font-family: 'Helvetica', Arial, sans-serif; color: #2C3E50; padding: 40px; }}
-        .header {{ text-align: center; border-bottom: 2px solid #C5A059; padding-bottom: 20px; margin-bottom: 30px; }}
-        .header h1 {{ margin: 0; font-family: 'Georgia', serif; color: #2C3E50; font-size: 26px; }}
-        .header p {{ color: #997A38; font-weight: bold; letter-spacing: 4px; font-size: 13px; margin-top: 5px; }}
-        .sub {{ color: #555; font-size: 12px; margin-top: 5px; }}
-        .info-box {{ background: #FDFCFB; padding: 20px; border-radius: 8px; border: 1px solid #EAE6DF; border-left: 5px solid #C5A059; margin-bottom: 30px; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; }}
-        th, td {{ border: 1px solid #EAE6DF; padding: 12px; text-align: left; font-size: 13px; }}
-        th {{ background-color: #2C3E50; color: white; }}
-        .total-box {{ font-size: 18px; font-weight: bold; color: #2C3E50; text-align: right; margin-top: 20px; padding: 15px; background: #F4F6F7; border-radius: 6px; }}
-        .parecer-box {{ background:
+        # Montagem do HTML sem f-strings complexas para evitar erros de sintaxe
+        html_relatorio = (
+            "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+            "<style>"
+            "body { font-family: 'Helvetica', Arial, sans-serif; color: #2C3E50; padding: 40px; }"
+            ".header { text-align: center; border-bottom: 2px solid #C5A059; padding-bottom: 20px; margin-bottom: 30px; }"
+            ".header h1 { margin: 0; font-family: 'Georgia', serif; color: #2C3E50; font-size: 26px; }"
+            ".header p { color: #997A38; font-weight: bold; letter-spacing: 4px; font-size: 13px; margin-top: 5px; }"
+            ".sub { color: #555; font-size: 12px; margin-top: 5px; }"
+            ".info-box { background: #FDFCFB; padding: 20px; border-radius: 8px; border: 1px solid #EAE6DF; border-left: 5px solid #C5A059; margin-bottom: 30px; }"
+            "table { width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; }"
+            "th, td { border: 1px solid #EAE6DF; padding: 12px; text-align: left; font-size: 13px; }"
+            "th { background-color: #2C3E50; color: white; }"
+            ".total-box { font-size: 18px; font-weight: bold; color: #2C3E50; text-align: right; margin-top: 20px; padding: 15px; background: #F4F6F7; border-radius: 6px; }"
+            ".parecer-box { background: #F9F9F9; border-left: 4px solid #C5A059; padding: 20px; margin-top: 30px; border-radius: 6px; font-size: 13px; line-height: 1.6; }"
+            "@media print { .no-print { display: none; } body { padding: 0; } }"
+            "</style></head><body>"
+            "<div style='text-align: center; margin-bottom: 30px;' class='no-print'>"
+            "<button onclick='window.print()' style='background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 12px 25px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>🖨️ Salvar Diretamente em PDF (Imprimir / Salvar)</button>"
+            "</div>"
+            "<div class='header'><h1>Samile Schmitt</h1><p>A D V O C A C I A</p><div class='sub'>Parecer Técnico Previdenciário / Tributário — Isenção de IR (Lei 7.713/88)</div></div>"
+            "<div class='info-box'>"
+            f"<p><b>Data da Análise:</b> {st.session_state['data_analise']}</p>"
+            f"<p><b>Cliente / Segurado:</b> {st.session_state['nome_editado']}</p>"
+            f"<p><b>Patologia / CID:</b> {st.session_state['patologia_editada']}</p>"
+            f"<p><b>Início da Enfermidade (Marco Inicial):</b> {st.session_state['data_editada']}</p>"
+            "</div>"
+            "<h3 style='color: #2C3E50; border-bottom: 1px solid #ddd; padding-bottom: 8px;'>Demonstrativo Consolidado de Créditos Tributários</h3>"
+            + st.session_state['df_final'].to_html(index=False, classes='table') +
+            f"<div class='total-box'>Montante Total de Restituição Apurado: R$ {st.session_state['soma_total']:,.2f}</div>"
+            "<div class='parecer-box'>"
+            "<h3 style='margin-top:0; color:#2C3E50;'>Fundamentação Técnica, Marco Temporal e Memória de Cálculo</h3>"
+            f"<p>A presente auditoria fiscal fundamenta-se estritamente no artigo 6º, inciso XIV, da <b>Lei nº 7.713/88</b>, que assegura a isenção tributária integral sobre proventos percebidos por portadores de moléstia grave a partir da comprovação médica da enfermidade ({st.session_state['data_editada']}).</p>"
+            "<p><b>Ponderação Temporal:</b> Para o exercício de 2023, aplicou-se a proporção temporal a partir da data do laudo médico (11/05/2023) até o encerramento do exercício. Os exercícios subsequentes (2024 e 2025) foram integralmente computados.</p>"
+            f"<p><b>Conclusão Estratégica:</b> O caso apresenta viabilidade jurídica plena, totalizando créditos passíveis de repetição de indébito de <b>R$ {st.session_state['soma_total']:,.2f}</b>.</p>"
+            "</div></body></html>"
+        )
+
+        b64 = base64.b64encode(html_relatorio.encode()).decode()
+        nome_arquivo = f"Laudo_Isencao_IR_{st.session_state['nome_editado'].replace(' ', '_')}.html"
+        
+        href = f'<a href="data:text/html;base64,{b64}" download="{nome_arquivo}" style="text-decoration: none;"><button style="background: linear-gradient(135deg, #C5A059 0%, #997A38 100%); color: white; border: none; padding: 0.7rem 1.5rem; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Baixar Relatório Oficial</button></a>'
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(href, unsafe_allow_html=True)
+else:
+    st.markdown("""
+        <div style="text-align: center; padding: 40px; background-color: #FFFFFF; border-radius: 8px; border: 1px dashed #C5A059; margin-top: 20px;">
+            <h3 style="color: #2C3E50;">Sistema de Isenção de IR</h3>
+            <p style="color: #666;">Insira sua chave de API na barra lateral e faça o upload dos documentos fiscais para iniciar a auditoria.</p>
+        </div>
+    """, unsafe_allow_html=True)
