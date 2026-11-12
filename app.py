@@ -52,8 +52,12 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Recupera a chave de API dos segredos do Streamlit (ou pede na lateral se não configurado)
-api_key_config = st.secrets.get("GEMINI_API_KEY", "")
+# Tenta carregar a chave dos segredos do Streamlit
+api_key_secret = ""
+try:
+    api_key_secret = st.secrets.get("GEMINI_API_KEY", "")
+except:
+    pass
 
 # Barra Lateral Profissional
 with st.sidebar:
@@ -69,10 +73,12 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    if not api_key_config:
+    
+    # Se não houver chave nos segredos, mostra o campo de texto para digitar
+    if not api_key_secret:
         api_key_input = st.text_input("Chave da API Gemini", type="password", help="Insira sua chave do Google AI Studio.")
     else:
-        api_key_input = api_key_config
+        api_key_input = api_key_secret
         st.success("🔒 Chave da API carregada com segurança.")
 
 # Função para extrair texto dos PDFs enviados
@@ -87,7 +93,8 @@ def extrair_texto_pdfs(files):
 # Função que usa o Gemini para extrair os dados estruturados dos documentos
 def analisar_documentos_com_ia(texto_documentos, api_key):
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-3.8-flash')
+    # Atualizado para o modelo padrão estável do Gemini
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""
     Você é um assistente jurídico sênior especializado em direito tributário e previdenciário (Lei 7.713/88).
